@@ -16,47 +16,31 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"log"
-	
+
+	"github.com/alibaba/loongsuite-go-agent/test/verifier"
 	"github.com/ollama/ollama/api"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
 
 func main() {
-	// Test Chat API instrumentation
-	client, err := api.ClientFromEnvironment()
-	if err != nil {
-		log.Printf("Creating default client: %v", err)
-		client = &api.Client{}
-	}
-	
 	ctx := context.Background()
+	client, server := NewMockOllamaChatForInvoke(ctx)
+	defer server.Close()
+	streamFlag := false
 	req := &api.ChatRequest{
 		Model: "llama3:8b",
 		Messages: []api.Message{
-			{Role: "user", Content: "Hello!"},
+			{Role: "user", Content: "Hello"},
 		},
+		Stream: &streamFlag,
 	}
-	
-	fmt.Println("Testing Chat API instrumentation...")
-	
-	// Track responses
-	var responses []api.ChatResponse
-	
-	// This will trigger our instrumentation
-	err = client.Chat(ctx, req, func(resp api.ChatResponse) error {
-		responses = append(responses, resp)
-		if resp.Done {
-			fmt.Printf("Final response: %s\n", resp.Message.Content)
-			fmt.Printf("Token counts - Input: %d, Output: %d\n", 
-				resp.PromptEvalCount, resp.EvalCount)
-		}
+	err := client.Chat(ctx, req, func(resp api.ChatResponse) error {
 		return nil
 	})
-	
 	if err != nil {
-		fmt.Printf("Chat error (expected if no server): %v\n", err)
+		panic(err)
 	}
-	
-	fmt.Println("Chat test completed!")
+	verifier.WaitAndAssertTraces(func(stubs []tracetest.SpanStubs) {
+		verifier.VerifyLLMAttributes(stubs[0][0], "chat", "ollama", "llama3:8b")
+	}, 1)
 }
