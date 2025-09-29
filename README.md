@@ -1,9 +1,7 @@
-![](docs/images/anim-logo.svg)
+![](docs/public/anim-logo.svg)
 
-[![](https://shields.io/badge/README-中文-blue?logo=dolphin)](./docs/README_CN.md)  &nbsp;
-[![](https://shields.io/badge/Loongsuite-Go商业版-blue?logo=alibabacloud)](https://help.aliyun.com/zh/arms/application-monitoring/getting-started/monitoring-the-golang-applications) &nbsp;
-[![](https://shields.io/badge/Loongsuite-Java-blue?logo=alibabacloud)](https://github.com/alibaba/loongsuite-java-agent)  &nbsp;
-[![](https://shields.io/badge/Loongsuite-Python-blue?logo=alibabacloud)](https://github.com/alibaba/loongsuite-python-agent)  &nbsp;
+[![](https://shields.io/badge/-Docs-blue?logo=readthedocs)](https://alibaba.github.io/loongsuite-go-agent/)  &nbsp;
+[![](https://shields.io/badge/-商业版-blue?logo=alibabacloud)](https://help.aliyun.com/zh/arms/application-monitoring/getting-started/monitoring-the-golang-applications) &nbsp;
 
 **Loongsuite Go Agent** provides an automatic solution for Golang applications that want to
 leverage OpenTelemetry to enable effective observability. No code changes are
@@ -14,21 +12,23 @@ time. Simply adding `otel` prefix to `go build` to get started :rocket:
 
 ### Prebuilt Binaries
 
-- [![Download](https://shields.io/badge/-Linux_AMD64-blue?logo=ubuntu)](https://github.com/alibaba/loongsuite-go-agent/releases/latest/download/otel-linux-amd64) [![Download](https://shields.io/badge/-Linux_ARM64-blue?logo=ubuntu)](https://github.com/alibaba/loongsuite-go-agent/releases/latest/download/otel-linux-arm64)
-- [![Download](https://shields.io/badge/-MacOS_AMD64-blue?logo=apple)](https://github.com/alibaba/loongsuite-go-agent/releases/latest/download/otel-darwin-amd64) [![Download](https://shields.io/badge/-MacOS_ARM64-blue?logo=apple)](https://github.com/alibaba/loongsuite-go-agent/releases/latest/download/otel-darwin-arm64)
+- [![Download](https://shields.io/badge/-Linux_AMD64-blue?logo=ubuntu)](https://github.com/alibaba/loongsuite-go-agent/releases/latest/download/otel-linux-amd64)
+- [![Download](https://shields.io/badge/-Linux_ARM64-blue?logo=ubuntu)](https://github.com/alibaba/loongsuite-go-agent/releases/latest/download/otel-linux-arm64)
+- [![Download](https://shields.io/badge/-MacOS_AMD64-blue?logo=apple)](https://github.com/alibaba/loongsuite-go-agent/releases/latest/download/otel-darwin-amd64)
+- [![Download](https://shields.io/badge/-MacOS_ARM64-blue?logo=apple)](https://github.com/alibaba/loongsuite-go-agent/releases/latest/download/otel-darwin-arm64)
 - [![Download](https://shields.io/badge/-Windows_AMD64-blue?logo=wine)](https://github.com/alibaba/loongsuite-go-agent/releases/latest/download/otel-windows-amd64.exe)
 
 **This is the recommended way to install the tool.**
 
 ### Install via Bash
 For Linux and MacOS users, the following script will install `otel` in `/usr/local/bin/otel` by default:
-```console
+```bash
 $ sudo curl -fsSL https://cdn.jsdelivr.net/gh/alibaba/loongsuite-go-agent@main/install.sh | sudo bash
 ```
 
 ### Build from Source
 
-```console
+```bash
 $ make         # build only
 $ make install # build and install
 ```
@@ -36,14 +36,14 @@ $ make install # build and install
 # Getting Started
 
 Make sure the tool is installed:
-```console
+```bash
 $ # You may use "otel-linux-amd64" instead of "otel"
 $ otel version
 ```
 
 Just adding `otel` prefix to `go build` to build your project:
 
-```console
+```bash
 $ otel go build
 $ otel go build -o app cmd/app
 $ otel go build -gcflags="-m" cmd/app
@@ -51,7 +51,7 @@ $ otel go build -gcflags="-m" cmd/app
 
 That's the whole process! The tool will automatically instrument your code with OpenTelemetry, and you can start to observe your application. :telescope:
 
-The detailed usage of `otel` tool can be found in [**Usage**](./docs/usage.md).
+The detailed usage of `otel` tool can be found in [**Usage**](./docs/user/config.md).
 
 > [!NOTE]
 > If you find any compilation failures while `go build` works, it's likely a bug.
@@ -61,12 +61,12 @@ The detailed usage of `otel` tool can be found in [**Usage**](./docs/usage.md).
 
 # Examples
 
-- [demo](./example/demo) - End-to-end example with OpenTelemetry tracing and metrics
-- [zap logging](./example/log) - Auto-instrumentation for `github.com/uber-go/zap` logging
-- [benchmark](./example/benchmark) - Performance testing and overhead measurement
-- [sql injection](./example/sqlinject) - Custom code injection for SQL injection detection
-- [nethttp](./example/nethttp) - HTTP monitoring with request/response instrumentation
-- [kratos-demo](./example/kratos-demo) - Integration with the Kratos framework
+- [demo](https://github.com/alibaba/loongsuite-go-agent/tree/main/example/demo) - End-to-end example with OpenTelemetry tracing and metrics
+- [zap logging](https://github.com/alibaba/loongsuite-go-agent/tree/main/example/log) - Auto-instrumentation for `github.com/uber-go/zap` logging
+- [benchmark](https://github.com/alibaba/loongsuite-go-agent/tree/main/example/benchmark) - Performance testing and overhead measurement
+- [sql injection](https://github.com/alibaba/loongsuite-go-agent/tree/main/example/sqlinject) - Custom code injection for SQL injection detection
+- [nethttp](https://github.com/alibaba/loongsuite-go-agent/tree/main/example/nethttp) - HTTP monitoring with request/response instrumentation
+- [kratos-demo](https://github.com/alibaba/loongsuite-go-agent/tree/main/example/kratos-demo) - Integration with the Kratos framework
 
 # Supported Libraries
 <details>
@@ -118,7 +118,7 @@ We are progressively open-sourcing the libraries we have supported, and your con
 > [!IMPORTANT]
 > The framework you expected is not in the list? Don't worry, you can easily inject your code into any frameworks/libraries that are not officially supported.
 >
-> Please refer to [this document](./docs/how-to-add-a-new-rule.md) to get started.
+> Please refer to [this document](./docs/dev/overview.md) to get started.
 
 # Community
 
@@ -128,4 +128,4 @@ to engage with us.
 
 | DingTalk | Star History |
 | :---: | :---: |
-| <img src="docs/images/dingtalk.png" height="200"> | <img src="https://api.star-history.com/svg?repos=alibaba/loongsuite-go-agent&type=Date" height="200"> |
+| <img src="./docs/public/dingtalk.png" height="200" /> | <img src="https://api.star-history.com/svg?repos=alibaba/loongsuite-go-agent&type=Date" height="200" /> |

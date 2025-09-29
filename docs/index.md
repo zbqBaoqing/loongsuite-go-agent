@@ -1,72 +1,75 @@
-![](images/anim-logo.svg)
+![](./public/anim-logo.svg)
 
-[![](https://shields.io/badge/-中文文档-black?logo=dolphin)](./docs/README_CN.md)  &nbsp;
-[![](https://shields.io/badge/-阿里云商业版-black?logo=alibabacloud)](https://help.aliyun.com/zh/arms/application-monitoring/getting-started/monitoring-the-golang-applications) &nbsp;
-[![](https://shields.io/badge/-Loongsuite_Java-black?logo=alibabacloud)](https://github.com/alibaba/loongsuite-java-agent)  &nbsp;
-[![](https://shields.io/badge/-Loongsuite_Python-black?logo=alibabacloud)](https://github.com/alibaba/loongsuite-python-agent)  &nbsp;
+**Loongsuite Go Agent** provides an automatic solution for Golang applications that want to
+leverage OpenTelemetry to enable effective observability. No code changes are
+required in the target application, the instrumentation is done at compile
+time. Simply adding `otel` prefix to `go build` to get started :rocket:
 
-**Loongsuite Go Agent** 为希望利用 OpenTelemetry 实现有效可观察性的 Golang 应用程序提供了一个自动解决方案。目标应用程序无需更改代码，插装是在编译时完成的。只需在 `go build` 前添加 `otel` 前缀即可开始 :rocket:
+# Installation
 
-# 安装
+### Prebuilt Binaries
 
-### 预编译二进制文件
+- [![Download](https://shields.io/badge/-Linux_AMD64-blue?logo=ubuntu)](https://github.com/alibaba/loongsuite-go-agent/releases/latest/download/otel-linux-amd64)
+- [![Download](https://shields.io/badge/-Linux_ARM64-blue?logo=ubuntu)](https://github.com/alibaba/loongsuite-go-agent/releases/latest/download/otel-linux-arm64)
+- [![Download](https://shields.io/badge/-MacOS_AMD64-blue?logo=apple)](https://github.com/alibaba/loongsuite-go-agent/releases/latest/download/otel-darwin-amd64)
+- [![Download](https://shields.io/badge/-MacOS_ARM64-blue?logo=apple)](https://github.com/alibaba/loongsuite-go-agent/releases/latest/download/otel-darwin-arm64)
+- [![Download](https://shields.io/badge/-Windows_AMD64-blue?logo=wine)](https://github.com/alibaba/loongsuite-go-agent/releases/latest/download/otel-windows-amd64.exe)
 
-| Linux AMD64 | Linux ARM64 | MacOS AMD64 | MacOS ARM64 | Windows AMD64 |
-| -- | -- | -- | -- | -- |
-| [![Download](https://shields.io/badge/-Download-black?logo=winamp)](https://github.com/alibaba/loongsuite-go-agent/releases/latest/download/otel-linux-amd64) | [![Download](https://shields.io/badge/-Download-black?logo=winamp)](https://github.com/alibaba/loongsuite-go-agent/releases/latest/download/otel-linux-arm64) | [![Download](https://shields.io/badge/-Download-black?logo=winamp)](https://github.com/alibaba/loongsuite-go-agent/releases/latest/download/otel-darwin-amd64) | [![Download](https://shields.io/badge/-Download-black?logo=winamp)](https://github.com/alibaba/loongsuite-go-agent/releases/latest/download/otel-darwin-amd64) | [![Download](https://shields.io/badge/-Download-black?logo=winamp)](https://github.com/alibaba/loongsuite-go-agent/releases/latest/download/otel-windows-amd64.exe) | 
+**This is the recommended way to install the tool.**
 
-**这是推荐的安装方式。**
-
-### 通过 Bash 安装
-对于 Linux 和 MacOS 用户，以下脚本将默认在 `/usr/local/bin/otel` 中安装 `otel`：
-```console
+### Install via Bash
+For Linux and MacOS users, the following script will install `otel` in `/usr/local/bin/otel` by default:
+```bash
 $ sudo curl -fsSL https://cdn.jsdelivr.net/gh/alibaba/loongsuite-go-agent@main/install.sh | sudo bash
 ```
 
-### 从源代码编译
+### Build from Source
 
-```console
-$ make         # 仅构建
-$ make install # 构建并安装
+```bash
+$ make         # build only
+$ make install # build and install
 ```
 
-# 开始使用
+# Getting Started
 
-确保工具已安装：
-```console
-$ # 您可以使用 "otel-linux-amd64" 而不是 "otel"
+Make sure the tool is installed:
+```bash
+$ # You may use "otel-linux-amd64" instead of "otel"
 $ otel version
 ```
 
-只需在 `go build` 前添加 `otel` 前缀来构建您的项目：
+Just adding `otel` prefix to `go build` to build your project:
 
-```console
+```bash
 $ otel go build
 $ otel go build -o app cmd/app
 $ otel go build -gcflags="-m" cmd/app
 ```
 
-这就是整个过程！该工具将自动使用 OpenTelemetry 对您的代码进行插装，您就可以开始观察您的应用程序了。:telescope:
+That's the whole process! The tool will automatically instrument your code with OpenTelemetry, and you can start to observe your application. :telescope:
 
-`otel` 工具的详细用法可以在 [**使用指南**](./usage.md) 中找到。
+The detailed usage of `otel` tool can be found in [**Usage**](./user/config.md).
 
-> [!NOTE] 
-> 如果您发现 `go build` 能正常工作但出现编译失败，这很可能是一个 bug。
-> 请随时在
-> [GitHub Issues](https://github.com/alibaba/loongsuite-go-agent/issues)
-> 提交问题报告以帮助我们改进本项目。
+> [!NOTE]
+> If you find any compilation failures while `go build` works, it's likely a bug.
+> Please feel free to file a bug
+> at [GitHub Issues](https://github.com/alibaba/loongsuite-go-agent/issues)
+> to help us enhance this project.
 
-# 示例
+# Examples
 
-- [demo](../example/demo) - 完整的端到端示例，演示使用 OpenTelemetry 追踪和指标收集的自动插装。
-- [zap logging](../example/log) - 集成示例，展示如何自动插装结构化日志记录与 `github.com/uber-go/zap` 包。
-- [benchmark](../example/benchmark) - 性能测试套件，用于测量自动插装工具的开销和效率。
-- [sql injection](../example/sqlinject) - 安全重点示例，演示用于 SQL 注入检测和预防的自定义代码注入。
-- [nethttp](../example/nethttp) - HTTP 监控示例，展示请求/响应头和网络流量分析的自动插装。
+- [demo](https://github.com/alibaba/loongsuite-go-agent/tree/main/example/demo) - End-to-end example with OpenTelemetry tracing and metrics
+- [zap logging](https://github.com/alibaba/loongsuite-go-agent/tree/main/example/log) - Auto-instrumentation for `github.com/uber-go/zap` logging
+- [benchmark](https://github.com/alibaba/loongsuite-go-agent/tree/main/example/benchmark) - Performance testing and overhead measurement
+- [sql injection](https://github.com/alibaba/loongsuite-go-agent/tree/main/example/sqlinject) - Custom code injection for SQL injection detection
+- [nethttp](https://github.com/alibaba/loongsuite-go-agent/tree/main/example/nethttp) - HTTP monitoring with request/response instrumentation
+- [kratos-demo](https://github.com/alibaba/loongsuite-go-agent/tree/main/example/kratos-demo) - Integration with the Kratos framework
 
-# 支持的库
+# Supported Libraries
+<details>
+ <summary>List of Supported Libraries</summary>
 
-| 库名称         | 存储库网址                                      | 最低支持版本           | 最高支持版本     |
+| Library       | Repository Url                                 | Min           Version | Max           Version |
 |---------------| ---------------------------------------------- |----------------------|-----------------------|
 | database/sql  | https://pkg.go.dev/database/sql                | -                    | -                     |
 | dubbo-go      | https://github.com/apache/dubbo-go             | v3.3.0               | -                     |
@@ -103,20 +106,24 @@ $ otel go build -gcflags="-m" cmd/app
 | zerolog       | https://github.com/rs/zerolog                  | v1.10.0              | v1.33.0               |
 | go-kit/log    | https://github.com/go-kit/log                  | v0.1.0               | v0.2.1                |
 | pg            | https://github.com/go-pg/pg                    | v1.10.0              | v1.14.0               |
-| gocql         | https://github.com/gocql/gocql                 | v1.3.0                | v1.7.0                |
+| gocql         | https://github.com/gocql/gocql                 | v1.3.0               | v1.7.0                |
+| sqlx          | https://github.com/jmoiron/sqlx                | v1.3.0               | v1.4.0                |
 
-我们正在逐步开源我们支持的库，非常欢迎您的贡献💖！
+</details>
+
+We are progressively open-sourcing the libraries we have supported, and your contributions are <kbd>Very Welcome</kbd>
 
 > [!IMPORTANT]
-> 您期望的框架不在列表中？别担心，您可以轻松地将代码注入到任何官方不支持的框架/库中。
+> The framework you expected is not in the list? Don't worry, you can easily inject your code into any frameworks/libraries that are not officially supported.
 >
-> 请参考 [这个文档](./how-to-add-a-new-rule.md) 开始使用。
+> Please refer to [this document](./dev/overview.md) to get started.
 
-# 社区
+# Community
 
-我们期待您的反馈和建议。您可以加入我们的 [钉钉群组](https://qr.dingtalk.com/action/joingroup?code=v1,k1,PBuICMTDvdh0En8MrVbHBYTGUcPXJ/NdT6JKCZ8CG+w=&_dt_no_comment=1&origin=11)
-与我们交流。
+We are looking forward to your feedback and suggestions. You can join
+our [DingTalk group](https://qr.dingtalk.com/action/joingroup?code=v1,k1,PBuICMTDvdh0En8MrVbHBYTGUcPXJ/NdT6JKCZ8CG+w=&_dt_no_comment=1&origin=11)
+to engage with us.
 
-| 钉钉群组 | Star 历史 |
+| DingTalk | Star History |
 | :---: | :---: |
-| <img src="images/dingtalk.png" height="200"> | <img src="https://api.star-history.com/svg?repos=alibaba/loongsuite-go-agent&type=Date" height="200"> |
+| <img src="./public/dingtalk.png" height="200" /> | <img src="https://api.star-history.com/svg?repos=alibaba/loongsuite-go-agent&type=Date" height="200" /> |
