@@ -2,12 +2,11 @@ module test
 
 go 1.23.0
 
-replace github.com/alibaba/loongsuite-go-agent => ../../
+replace github.com/alibaba/loongsuite-go-agent/pkg => ../../pkg
 
 replace github.com/alibaba/loongsuite-go-agent/test/verifier => ../../test/verifier
 
 require (
-	github.com/alibaba/loongsuite-go-agent/pkg v0.0.0-00010101000000-000000000000
 	go.opentelemetry.io/otel/sdk v1.35.0
 	go.uber.org/zap v1.27.0
 )
