@@ -5,6 +5,17 @@ export default {
     description: 'It provides an automatic solution for Golang applications that want to leverage OpenTelemetry to enable effective observability. No code changes are required in the target application, the instrumentation is done at compile time. Simply adding `otel` prefix to `go build` to get started ', 
     ignoreDeadLinks: true,
     base: '/loongsuite-go-agent/',
+    locales: {
+        root: {
+          label: 'English',
+          lang: 'en-US',
+        },
+        zh: {
+          label: '简体中文',
+          lang: 'zh-CN',
+          link: '/zh/',
+        },
+    },
     themeConfig: {
         logo: '/anim-logo.svg',
         nav: [
@@ -34,46 +45,89 @@ export default {
         editLink: {
             pattern: `${repoRoot}/edit/main/docs/:path`
         },
-        sidebar: [
-            {
-              text: '🌟 User Guide',
-              items: [
-                { text: 'Overview', link: '/index' },
-                { text: 'Advanced Config', link: '/user/config' },
-                { text: 'Compilation Time', link: '/user/compilation-time' },
-                { text: 'Experimental', link: '/user/experimental-feature' },
-                { text: 'Compatibility', link: '/user/compatibility' },
-                { text: 'Manual Instrumentation', link: '/user/manual_instrumentation' },
-                { text: 'Context Propagation', link: '/user/context-propagation' },
-              ]
-            },
-            {
-                text: '🔧 Developer Guide',
-                items: [
-                    { text: 'Overview', link: '/dev/overview' },
-                    { text: 'Register Hook Rule', link: '/dev/register' },
-                    { text: 'Write the Hook Code', link: '/dev/hook' },
-                    { text: 'Test the Hook Code', link: '/dev/test' },
-                    { text: 'Hook Rule Types', link: '/dev/rule_def' },
-                ]
-              },
-            {
-                text: '🤠 Hacking Guide',
-                items: [
-                  { text: 'Overview', link: '/hacking/overview' },
-                  { text: 'Preprocess Phase', link: '/hacking/preprocess' },
-                  { text: 'Instrument Phase', link: '/hacking/instrument' },
-                  { text: 'AST Optimization', link: '/hacking/optimize' },
-                  { text: 'Debugging', link: '/hacking/debug' },
-                  { text: 'Tool Internal Slides', link: 'https://github.com/alibaba/loongsuite-go-agent/blob/main/docs/otel-alibaba.pdf' },
-                ]
-            },
-            {
-                text: '🌐 Community',
-                items: [
-                    { text: 'DingTalk', link: 'https://qr.dingtalk.com/action/joingroup?code=v1,k1,PBuICMTDvdh0En8MrVbHBYTGUcPXJ/NdT6JKCZ8CG+w=&_dt_no_comment=1&origin=11' },
-                ]
-            },
-        ]
+        sidebar: {
+            '/': [
+                {
+                  text: '🌟 User Guide',
+                  items: [
+                    { text: 'Overview', link: '/index' },
+                    { text: 'Advanced Config', link: '/user/config' },
+                    { text: 'Compilation Time', link: '/user/compilation-time' },
+                    { text: 'Experimental', link: '/user/experimental-feature' },
+                    { text: 'Compatibility', link: '/user/compatibility' },
+                    { text: 'Manual Instrumentation', link: '/user/manual_instrumentation' },
+                    { text: 'Context Propagation', link: '/user/context-propagation' },
+                  ]
+                },
+                {
+                    text: '🔧 Developer Guide',
+                    items: [
+                        { text: 'Overview', link: '/dev/overview' },
+                        { text: 'Register Hook Rule', link: '/dev/register' },
+                        { text: 'Write the Hook Code', link: '/dev/hook' },
+                        { text: 'Test the Hook Code', link: '/dev/test' },
+                        { text: 'Hook Rule Types', link: '/dev/rule_def' },
+                    ]
+                  },
+                {
+                    text: '🤠 Hacking Guide',
+                    items: [
+                      { text: 'Overview', link: '/hacking/overview' },
+                      { text: 'Preprocess Phase', link: '/hacking/preprocess' },
+                      { text: 'Instrument Phase', link: '/hacking/instrument' },
+                      { text: 'AST Optimization', link: '/hacking/optimize' },
+                      { text: 'Debugging', link: '/hacking/debug' },
+                      { text: 'Tool Internal Slides', link: 'https://github.com/alibaba/loongsuite-go-agent/blob/main/docs/otel-alibaba.pdf' },
+                    ]
+                },
+                {
+                    text: '🌐 Community',
+                    items: [
+                        { text: 'DingTalk', link: 'https://qr.dingtalk.com/action/joingroup?code=v1,k1,PBuICMTDvdh0En8MrVbHBYTGUcPXJ/NdT6JKCZ8CG+w=&_dt_no_comment=1&origin=11' },
+                    ]
+                },
+            ],
+            '/zh/': [
+                {
+                  text: '🌟 用户指南',
+                  items: [
+                    { text: '概述', link: '/zh/index' },
+                    { text: '高级配置', link: '/zh/user/config' },
+                    { text: '编译时间', link: '/zh/user/compilation-time' },
+                    { text: '实验性功能', link: '/zh/user/experimental-feature' },
+                    { text: '兼容性', link: '/zh/user/compatibility' },
+                    { text: '手动埋点', link: '/zh/user/manual_instrumentation' },
+                    { text: '上下文传播', link: '/zh/user/context-propagation' },
+                  ]
+                },
+                {
+                    text: '🔧开发者指南',
+                    items: [
+                        { text: '概述', link: '/zh/dev/overview' },
+                        { text: '注册Hook规则', link: '/zh/dev/register' },
+                        { text: '编写Hook代码', link: '/zh/dev/hook' },
+                        { text: '测试Hook代码', link: '/zh/dev/test' },
+                        { text: 'Hook规则类型', link: '/zh/dev/rule_def' },
+                    ]
+                  },
+                {
+                    text: '🤠 黑客指南',
+                    items: [
+                      { text: '概述', link: '/zh/hacking/overview' },
+                      { text: '预处理阶段', link: '/zh/hacking/preprocess' },
+                      { text: '埋点阶段', link: '/zh/hacking/instrument' },
+                      { text: 'AST优化', link: '/zh/hacking/optimize' },
+                      { text: '调试', link: '/zh/hacking/debug' },
+                      { text: '工具内幕幻灯片', link: 'https://github.com/alibaba/loongsuite-go-agent/blob/main/docs/otel-alibaba.pdf' },
+                    ]
+                },
+                {
+                    text: '🌐 社区',
+                    items: [
+                        { text: '钉钉', link: 'https://qr.dingtalk.com/action/joingroup?code=v1,k1,PBuICMTDvdh0En8MrVbHBYTGUcPXJ/NdT6JKCZ8CG+w=&_dt_no_comment=1&origin=11' },
+                    ]
+                },
+            ]
+        }
     }
 }
