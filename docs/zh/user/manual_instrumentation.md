@@ -6,7 +6,7 @@
 
 基于`example/demo`，自动埋点会生成一个trace，其中HTTP服务作为根span，Redis和MySQL操作作为子span。
 
-![](../public/auto_instr_jaeger.png)
+![](../../public/auto_instr_jaeger.png)
 
 ### 结合手动埋点
 
@@ -25,4 +25,4 @@ func traceService(w http.ResponseWriter, r *http.Request) {
 
 在Jaeger中生成的trace如下。
 
-![](../public/manual_instr_jaeger.png)
+![](../../public/manual_instr_jaeger.png)

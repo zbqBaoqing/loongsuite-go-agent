@@ -1,4 +1,4 @@
-![](./public/anim-logo.svg)
+![](../public/anim-logo.svg)
 
 **龙蜥Go-Agent** 为希望利用OpenTelemetry实现有效可观察性的Golang应用程序提供了一个自动化的解决方案。目标应用程序无需更改代码，埋点在编译时完成。只需在`go build`前加上`otel`前缀即可开始使用 :rocket:
 
@@ -120,4 +120,4 @@ $ otel go build -gcflags="-m" cmd/app
 
 | 钉钉 | Star历史 |
 | :---: | :---: |
-| <img src="./public/dingtalk.png" height="200" /> | <img src="https://api.star-history.com/svg?repos=alibaba/loongsuite-go-agent&type=Date" height="200" /> |
+| <img src="../public/dingtalk.png" height="200" /> | <img src="https://api.star-history.com/svg?repos=alibaba/loongsuite-go-agent&type=Date" height="200" /> |
