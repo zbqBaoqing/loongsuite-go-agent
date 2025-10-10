@@ -1,7 +1,7 @@
 const repoRoot = 'https://github.com/alibaba/loongsuite-go-agent';
 export default {
     lang: 'en-US',
-    title: 'Otel',
+    title: ' ',
     description: 'It provides an automatic solution for Golang applications that want to leverage OpenTelemetry to enable effective observability. No code changes are required in the target application, the instrumentation is done at compile time. Simply adding `otel` prefix to `go build` to get started ', 
     ignoreDeadLinks: true,
     base: '/loongsuite-go-agent/',
@@ -17,7 +17,7 @@ export default {
         },
     },
     themeConfig: {
-        logo: '/anim-logo.svg',
+        logo: '/loongsuite.png',
         nav: [
             { 
                 text: 'Download',
@@ -51,12 +51,13 @@ export default {
                   text: '🌟 User Guide',
                   items: [
                     { text: 'Overview', link: '/index' },
-                    { text: 'Advanced Config', link: '/user/config' },
+                    { text: 'CLI Reference', link: '/user/config' },
                     { text: 'Compilation Time', link: '/user/compilation-time' },
                     { text: 'Experimental', link: '/user/experimental-feature' },
                     { text: 'Compatibility', link: '/user/compatibility' },
-                    { text: 'Manual Instrumentation', link: '/user/manual_instrumentation' },
+                    { text: 'Manual Instrumentation', link: '/user/manual-instrument' },
                     { text: 'Context Propagation', link: '/user/context-propagation' },
+                    { text: 'OpenTelemetry Settings', link: '/user/sdk-config' },
                   ]
                 },
                 {
@@ -92,12 +93,13 @@ export default {
                   text: '🌟 用户指南',
                   items: [
                     { text: '概述', link: '/zh/index' },
-                    { text: '高级配置', link: '/zh/user/config' },
+                    { text: '命令行参考', link: '/zh/user/config' },
                     { text: '编译时间', link: '/zh/user/compilation-time' },
                     { text: '实验性功能', link: '/zh/user/experimental-feature' },
                     { text: '兼容性', link: '/zh/user/compatibility' },
-                    { text: '手动埋点', link: '/zh/user/manual_instrumentation' },
+                    { text: '手动埋点', link: '/zh/user/manual-instrument' },
                     { text: '上下文传播', link: '/zh/user/context-propagation' },
+                    { text: 'OpenTelemetry 配置', link: '/zh/user/sdk-config' },
                   ]
                 },
                 {
