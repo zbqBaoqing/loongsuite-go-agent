@@ -11,6 +11,7 @@ require (
 	github.com/testcontainers/testcontainers-go v0.38.0
 	github.com/testcontainers/testcontainers-go/modules/k3s v0.38.0
 	github.com/testcontainers/testcontainers-go/modules/mysql v0.37.0
+	go.opentelemetry.io/otel/sdk/metric v1.35.0
 	golang.org/x/mod v0.24.0
 	golang.org/x/sync v0.14.0
 	golang.org/x/tools v0.33.0
@@ -63,6 +64,7 @@ require (
 	go.opentelemetry.io/otel v1.35.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.35.0 // indirect
 	go.opentelemetry.io/otel/metric v1.35.0 // indirect
+	go.opentelemetry.io/otel/sdk v1.35.0 // indirect
 	go.opentelemetry.io/otel/trace v1.35.0 // indirect
 	golang.org/x/crypto v0.38.0 // indirect
 	golang.org/x/oauth2 v0.27.0 // indirect

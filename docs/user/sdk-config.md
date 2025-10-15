@@ -12,4 +12,8 @@ In addition to automatic instrumentation, the `otel` tool injects configuration 
 - `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT`: Specifies the endpoint for OTLP metrics exporter.
 - `OTEL_EXPORTER_OTLP_HEADERS`: Specifies headers for all OTLP exporters (e.g., `key1=value1,key2=value2`).
 - `OTEL_EXPORTER_PROMETHEUS_PORT`: Specifies the port for the Prometheus exporter when `OTEL_METRICS_EXPORTER` is set to `prometheus`. Defaults to `9464`.
+- `OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE`: Specifies the aggregation temporality preference for metrics (case-insensitive). Supported values:
+  - `cumulative` (default): All instrument kinds use Cumulative temporality
+  - `delta`: Counter, Asynchronous Counter, and Histogram use Delta temporality; UpDownCounter and Asynchronous UpDownCounter use Cumulative temporality
+  - `lowmemory`: Synchronous Counter and Histogram use Delta temporality; other types use Cumulative temporality (low memory mode)
 - `OTEL_TRACE_SAMPLER`: Specifies the trace sampler. A floating-point number between 0.0 and 1.0 sets a ratio-based sampler. Values <= 0 will never sample, and values >= 1 will always sample. The default is a parent-based sampler that always samples.

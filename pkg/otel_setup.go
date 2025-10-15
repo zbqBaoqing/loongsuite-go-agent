@@ -52,6 +52,7 @@ import (
 	"go.opentelemetry.io/otel/metric/noop"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"go.opentelemetry.io/otel/sdk/trace"
 )
 
@@ -66,6 +67,7 @@ const metrics_exporter = "OTEL_METRICS_EXPORTER"
 const trace_exporter = "OTEL_TRACES_EXPORTER"
 const prometheus_exporter_port = "OTEL_EXPORTER_PROMETHEUS_PORT"
 const default_prometheus_exporter_port = "9464"
+const metrics_temporality_preference = "OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE"
 
 const trace_sampler = "OTEL_TRACE_SAMPLER"
 
@@ -200,6 +202,61 @@ func newSpanSampler() trace.Sampler {
 	}
 }
 
+func getTemporalitySelector() metric.TemporalitySelector {
+	pref := strings.ToLower(strings.TrimSpace(os.Getenv(metrics_temporality_preference)))
+	
+	switch pref {
+	case "cumulative":
+		return cumulativeTemporalitySelector
+	case "delta":
+		return deltaTemporalitySelector
+	case "lowmemory":
+		return lowMemoryTemporalitySelector
+	default:
+		// Default to cumulative if not set or invalid value
+		if pref != "" {
+			log.Printf("Warning: Invalid OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE value '%s', using default 'cumulative'", pref)
+		}
+		return cumulativeTemporalitySelector
+	}
+}
+
+// cumulativeTemporalitySelector returns Cumulative temporality for all instrument kinds
+func cumulativeTemporalitySelector(metric.InstrumentKind) metricdata.Temporality {
+	return metricdata.CumulativeTemporality
+}
+
+// deltaTemporalitySelector implements the "delta" preference:
+// - Counter, Async Counter, Histogram: Delta
+// - UpDownCounter, Async UpDownCounter: Cumulative
+// - Gauge: Cumulative
+func deltaTemporalitySelector(ik metric.InstrumentKind) metricdata.Temporality {
+	switch ik {
+	case metric.InstrumentKindCounter,
+		metric.InstrumentKindObservableCounter,
+		metric.InstrumentKindHistogram:
+		return metricdata.DeltaTemporality
+	default:
+		// UpDownCounter, ObservableUpDownCounter, ObservableGauge
+		return metricdata.CumulativeTemporality
+	}
+}
+
+// lowMemoryTemporalitySelector implements the "lowmemory" preference:
+// - Sync Counter, Histogram: Delta
+// - Sync UpDownCounter, Async Counter, Async UpDownCounter: Cumulative
+// - Gauge: Cumulative
+func lowMemoryTemporalitySelector(ik metric.InstrumentKind) metricdata.Temporality {
+	switch ik {
+	case metric.InstrumentKindCounter,
+		metric.InstrumentKindHistogram:
+		return metricdata.DeltaTemporality
+	default:
+		// UpDownCounter, ObservableCounter, ObservableUpDownCounter, ObservableGauge
+		return metricdata.CumulativeTemporality
+	}
+}
+
 func initOpenTelemetry(ctx context.Context) error {
 	processors := newSpanProcessors(ctx)
 	spanSampler = newSpanSampler()
@@ -278,9 +335,12 @@ func initMetrics() error {
 }
 
 func createMetricReader(ctx context.Context, name string) (metric.Reader, metric.Exporter, error) {
+	// Get temporality selector for exporters that support it
+	temporalitySelector := getTemporalitySelector()
+	
 	switch name {
 	case "console":
-		exporter, err := stdoutmetric.New()
+		exporter, err := stdoutmetric.New(stdoutmetric.WithTemporalitySelector(temporalitySelector))
 		if err != nil {
 			return nil, nil, err
 		}
@@ -295,9 +355,9 @@ func createMetricReader(ctx context.Context, name string) (metric.Reader, metric
 		var exporter metric.Exporter
 		var err error
 		if os.Getenv(report_protocol) == "grpc" || os.Getenv(trace_report_protocol) == "grpc" {
-			exporter, err = otlpmetricgrpc.New(ctx)
+			exporter, err = otlpmetricgrpc.New(ctx, otlpmetricgrpc.WithTemporalitySelector(temporalitySelector))
 		} else {
-			exporter, err = otlpmetrichttp.New(ctx)
+			exporter, err = otlpmetrichttp.New(ctx, otlpmetrichttp.WithTemporalitySelector(temporalitySelector))
 		}
 		if err != nil {
 			return nil, nil, err

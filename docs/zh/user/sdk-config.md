@@ -12,4 +12,8 @@
 - `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT`: 指定 OTLP 指标导出器的端点。
 - `OTEL_EXPORTER_OTLP_HEADERS`: 为所有 OTLP 导出器指定请求头 (例如, `key1=value1,key2=value2`)。
 - `OTEL_EXPORTER_PROMETHEUS_PORT`: 当 `OTEL_METRICS_EXPORTER` 设置为 `prometheus` 时，指定 Prometheus 导出器的端口。默认为 `9464`。
+- `OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE`: 指定指标的聚合时间性偏好（不区分大小写）。支持的值:
+  - `cumulative` (默认): 所有指标类型都使用累积时间性
+  - `delta`: Counter、Asynchronous Counter 和 Histogram 使用增量时间性；UpDownCounter 和 Asynchronous UpDownCounter 使用累积时间性
+  - `lowmemory`: Synchronous Counter 和 Histogram 使用增量时间性；其他类型使用累积时间性（低内存模式）
 - `OTEL_TRACE_SAMPLER`: 指定链路采样器。0.0 到 1.0 之间的浮点数会设置一个基于比率的采样器。小于等于 0 的值将永不采样，大于等于 1 的值将始终采样。默认是基于父级的采样器，并且始终采样。
