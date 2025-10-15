@@ -3,8 +3,8 @@
 `otel`工具除了自动埋点外，还会注入配置代码，在应用启动时会初始化 OpenTelemetry SDK，使用以下环境变量可以改变 OpenTelemetry SDK 的行为。
 
 - `OTEL_SERVICE_NAME`: 为您的应用指定服务名称。
-- `OTEL_TRACES_EXPORTER`: 指定链路导出器。支持的值: `none`, `console`, `zipkin`。默认为 `otlp`。
-- `OTEL_METRICS_EXPORTER`: 指定指标导出器。支持的值: `none`, `console`, `prometheus`。默认为 `otlp`。
+- `OTEL_TRACES_EXPORTER`: 指定链路导出器。支持的值: `none`, `console`, `zipkin`, `otlp`。支持使用逗号分隔指定多个导出器（例如 `console,otlp`）。默认为 `otlp`。
+- `OTEL_METRICS_EXPORTER`: 指定指标导出器。支持的值: `none`, `console`, `prometheus`, `otlp`。支持使用逗号分隔指定多个导出器（例如 `console,otlp`）。默认为 `otlp`。
 - `OTEL_EXPORTER_OTLP_PROTOCOL`: 指定 OTLP 协议，用于链路和指标。支持的值: `http/protobuf` (默认), `grpc`。
 - `OTEL_EXPORTER_OTLP_TRACES_PROTOCOL`: 指定用于链路的 OTLP 协议，会覆盖 `OTEL_EXPORTER_OTLP_PROTOCOL` 的设置。支持的值: `http/protobuf` (默认), `grpc`。
 - `OTEL_EXPORTER_OTLP_ENDPOINT`: 指定 OTLP 导出器的通用端点。
