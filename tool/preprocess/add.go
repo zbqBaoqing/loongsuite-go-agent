@@ -110,7 +110,7 @@ func (dp *DepProcessor) findRuleDir(path string) (string, string, error) {
 	}
 }
 
-func (dp *DepProcessor) newDeps(bundles []*rules.RuleBundle) error {
+func (dp *DepProcessor) newDeps(bundles []*rules.InstRuleSet) error {
 	content := "package main\n"
 	builtin := map[string]string{
 		// for go:linkname when declaring printstack/getstack variable
@@ -144,25 +144,23 @@ func (dp *DepProcessor) newDeps(bundles []*rules.RuleBundle) error {
 	// Generate the otel.runtime.go file with the rule bundles
 	addDeps := make([]Dependency, 0)
 	for _, bundle := range bundles {
-		for _, funcRules := range bundle.File2FuncRules {
-			for _, rules := range funcRules {
-				for _, rule := range rules {
-					path := rule.GetPath()
-					if path != "" {
-						moduleName, replacePath, err := dp.findRuleDir(path)
-						if err != nil {
-							return err
-						}
-						content += fmt.Sprintf("import _ %q\n", moduleName)
-						addDeps = append(addDeps, Dependency{
-							ImportPath: moduleName,
-							// use latest version for the rule import
-							Version:        "v0.0.0-00010101000000-000000000000",
-							Replace:        true,
-							ReplacePath:    replacePath,
-							ReplaceVersion: "",
-						})
+		for _, funcRules := range bundle.FuncRules {
+			for _, rule := range funcRules {
+				path := rule.GetPath()
+				if path != "" {
+					moduleName, replacePath, err := dp.findRuleDir(path)
+					if err != nil {
+						return err
 					}
+					content += fmt.Sprintf("import _ %q\n", moduleName)
+					addDeps = append(addDeps, Dependency{
+						ImportPath: moduleName,
+						// use latest version for the rule import
+						Version:        "v0.0.0-00010101000000-000000000000",
+						Replace:        true,
+						ReplacePath:    replacePath,
+						ReplaceVersion: "",
+					})
 				}
 			}
 		}

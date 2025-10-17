@@ -16,7 +16,6 @@ package rules
 
 import (
 	"encoding/json"
-	"path/filepath"
 
 	"github.com/alibaba/loongsuite-go-agent/tool/ex"
 	"github.com/alibaba/loongsuite-go-agent/tool/util"
@@ -26,80 +25,64 @@ const (
 	MatchedRulesJsonFile = "matched_rules.json"
 )
 
-// RuleBundle is a collection of rules that matched with one compilation action
-type RuleBundle struct {
-	PackageName      string
-	ImportPath       string
-	FileRules        []*InstFileRule
-	File2FuncRules   map[string]map[string][]*InstFuncRule
-	File2StructRules map[string]map[string][]*InstStructRule
+// InstRuleSet is a collection of rules that matched with one compilation action
+type InstRuleSet struct {
+	PackageName string
+	ImportPath  string
+	FileRules   []*InstFileRule
+	FuncRules   map[string][]*InstFuncRule
+	StructRules map[string][]*InstStructRule
 }
 
-func NewRuleBundle(importPath string) *RuleBundle {
-	return &RuleBundle{
-		PackageName:      "",
-		ImportPath:       importPath,
-		FileRules:        make([]*InstFileRule, 0),
-		File2FuncRules:   make(map[string]map[string][]*InstFuncRule),
-		File2StructRules: make(map[string]map[string][]*InstStructRule),
+func NewInstRuleSet(importPath string) *InstRuleSet {
+	return &InstRuleSet{
+		PackageName: "",
+		ImportPath:  importPath,
+		FileRules:   make([]*InstFileRule, 0),
+		FuncRules:   make(map[string][]*InstFuncRule),
+		StructRules: make(map[string][]*InstStructRule),
 	}
 }
 
-func (rb *RuleBundle) String() string {
+func (rb *InstRuleSet) String() string {
 	bs, _ := json.Marshal(rb)
 	return string(bs)
 }
 
-func (rb *RuleBundle) IsValid() bool {
+func (rb *InstRuleSet) IsValid() bool {
 	return rb != nil &&
 		(len(rb.FileRules) > 0 ||
-			len(rb.File2FuncRules) > 0 ||
-			len(rb.File2StructRules) > 0)
+			len(rb.FuncRules) > 0 ||
+			len(rb.StructRules) > 0)
 }
 
-func (rb *RuleBundle) AddFile2FuncRule(file string, rule *InstFuncRule) error {
-	file, err := filepath.Abs(file)
-	if err != nil {
-		return ex.Wrap(err)
-	}
-	fn := rule.Function + "," + rule.ReceiverType
-	util.Assert(fn != "", "sanity check")
-	if _, exist := rb.File2FuncRules[file]; !exist {
-		rb.File2FuncRules[file] = make(map[string][]*InstFuncRule)
-		rb.File2FuncRules[file][fn] = []*InstFuncRule{rule}
+func (rb *InstRuleSet) AddFuncRule(file string, rule *InstFuncRule) {
+	if _, exist := rb.FuncRules[file]; !exist {
+		rb.FuncRules[file] = make([]*InstFuncRule, 0)
+		rb.FuncRules[file] = []*InstFuncRule{rule}
 	} else {
-		rb.File2FuncRules[file][fn] =
-			append(rb.File2FuncRules[file][fn], rule)
+		rb.FuncRules[file] = append(rb.FuncRules[file], rule)
 	}
-	return nil
 }
 
-func (rb *RuleBundle) AddFile2StructRule(file string, rule *InstStructRule) error {
-	file, err := filepath.Abs(file)
-	if err != nil {
-		return ex.Wrap(err)
-	}
-	st := rule.StructType
-	util.Assert(st != "", "sanity check")
-	if _, exist := rb.File2StructRules[file]; !exist {
-		rb.File2StructRules[file] = make(map[string][]*InstStructRule)
-		rb.File2StructRules[file][st] = []*InstStructRule{rule}
+func (rb *InstRuleSet) AddStructRule(file string, rule *InstStructRule) {
+	if _, exist := rb.StructRules[file]; !exist {
+		rb.StructRules[file] = make([]*InstStructRule, 0)
+		rb.StructRules[file] = []*InstStructRule{rule}
 	} else {
-		rb.File2StructRules[file][st] =
-			append(rb.File2StructRules[file][st], rule)
+		rb.StructRules[file] = append(rb.StructRules[file], rule)
 	}
-	return nil
 }
 
-func (rb *RuleBundle) SetPackageName(name string) {
+func (rb *InstRuleSet) SetPackageName(name string) {
 	rb.PackageName = name
 }
 
-func (rb *RuleBundle) AddFileRule(rule *InstFileRule) {
+func (rb *InstRuleSet) AddFileRule(rule *InstFileRule) {
 	rb.FileRules = append(rb.FileRules, rule)
 }
 
-func StoreRuleBundles(bundles []*RuleBundle) error {
+func StoreRuleBundles(bundles []*InstRuleSet) error {
 	util.GuaranteeInPreprocess()
 	ruleFile := util.GetPreprocessLogPath(MatchedRulesJsonFile)
 	bs, err := json.Marshal(bundles)
@@ -113,7 +96,7 @@ func StoreRuleBundles(bundles []*RuleBundle) error {
 	return nil
 }
 
-func LoadRuleBundles() ([]*RuleBundle, error) {
+func LoadRuleBundles() ([]*InstRuleSet, error) {
 	util.GuaranteeInInstrument()
 
 	ruleFile := util.GetPreprocessLogPath(MatchedRulesJsonFile)
@@ -121,7 +104,7 @@ func LoadRuleBundles() ([]*RuleBundle, error) {
 	if err != nil {
 		return nil, err
 	}
-	var bundles []*RuleBundle
+	var bundles []*InstRuleSet
 	err = json.Unmarshal([]byte(data), &bundles)
 	if err != nil {
 		return nil, ex.Wrapf(err, "bad "+ruleFile)
