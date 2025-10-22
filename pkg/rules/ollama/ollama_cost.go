@@ -144,9 +144,9 @@ type costDataPoint struct {
 }
 
 var (
-	globalCalculator *CostCalculator
-	globalPricingDB *PricingDatabase
-	globalBudget   *BudgetTracker
+	costCalculator *CostCalculator
+	pricingDB *PricingDatabase
+	budgetTracker   *BudgetTracker
 )
 
 var defaultPricing = map[string]*ModelPricing{
@@ -210,21 +210,21 @@ var defaultExchangeRates = map[Currency]float64{
 }
 
 func init() {
-	globalPricingDB = &PricingDatabase{
+	pricingDB = &PricingDatabase{
 		prices:   make(map[string]*ModelPricing),
 		currency: USD,
 		rates:    defaultExchangeRates,
 	}
 	
 	for modelID, pricing := range defaultPricing {
-		globalPricingDB.prices[modelID] = pricing
+		pricingDB.prices[modelID] = pricing
 		baseName := strings.Split(modelID, ":")[0]
 		if baseName != modelID {
-			globalPricingDB.prices[baseName] = pricing
+			pricingDB.prices[baseName] = pricing
 		}
 	}
 	
-	globalPricingDB.loadCustomPricing()
+	pricingDB.loadCustomPricing()
 
 	enabledStr := "true"
 	if val := os.Getenv("OLLAMA_ENABLE_COST_TRACKING"); val != "" {
@@ -237,16 +237,16 @@ func init() {
 		currencyStr = val
 	}
 	
-	globalCalculator = &CostCalculator{
-		pricingDB:        globalPricingDB,
+	costCalculator = &CostCalculator{
+		pricingDB:        pricingDB,
 		enableCalculation: enabled,
 		defaultCurrency:  Currency(currencyStr),
 	}
-	globalCalculator.totalCost.Store(float64(0))
+	costCalculator.totalCost.Store(float64(0))
 
 	config := getDefaultBudgetConfig()
 	
-	globalBudget = &BudgetTracker{
+	budgetTracker = &BudgetTracker{
 		config:        config,
 		currentSpend:  0,
 		startTime:     time.Now(),
@@ -258,7 +258,7 @@ func init() {
 	}
 	
 	if config.Period != "" {
-		go globalBudget.startPeriodicReset(config.Period)
+		go budgetTracker.startPeriodicReset(config.Period)
 	}
 }
 
@@ -816,4 +816,162 @@ func (bt *BudgetTracker) UpdateConfig(config *BudgetConfig) {
 	bt.mu.Lock()
 	defer bt.mu.Unlock()
 	bt.config = config
+}
+
+type SLOConfig struct {
+	LatencyThreshold    time.Duration
+	ErrorRateThreshold  float64
+	P50Target           time.Duration
+	P95Target           time.Duration
+	P99Target           time.Duration
+	WindowSize          time.Duration
+	EvaluationInterval  time.Duration
+}
+
+type SLOTracker struct {
+	config           *SLOConfig
+	latencies        []time.Duration
+	errors           []bool
+	mu               sync.RWMutex
+	lastEvaluation   time.Time
+	p50              time.Duration
+	p95              time.Duration
+	p99              time.Duration
+	errorRate        float64
+	violations       int
+	totalRequests    int64
+}
+
+var sloTracker *SLOTracker
+
+func init() {
+	sloTracker = &SLOTracker{
+		config: &SLOConfig{
+			LatencyThreshold:   2 * time.Second,
+			ErrorRateThreshold: 0.01,
+			P50Target:          500 * time.Millisecond,
+			P95Target:          1500 * time.Millisecond,
+			P99Target:          3000 * time.Millisecond,
+			WindowSize:         5 * time.Minute,
+			EvaluationInterval: 1 * time.Minute,
+		},
+		latencies:      make([]time.Duration, 0, 1000),
+		errors:         make([]bool, 0, 1000),
+		lastEvaluation: time.Now(),
+	}
+}
+
+func (st *SLOTracker) RecordRequest(latency time.Duration, isError bool) {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+
+	st.latencies = append(st.latencies, latency)
+	st.errors = append(st.errors, isError)
+	atomic.AddInt64(&st.totalRequests, 1)
+
+	if len(st.latencies) > 10000 {
+		st.latencies = st.latencies[5000:]
+		st.errors = st.errors[5000:]
+	}
+
+	if time.Since(st.lastEvaluation) > st.config.EvaluationInterval {
+		st.evaluate()
+	}
+}
+
+func (st *SLOTracker) evaluate() {
+	if len(st.latencies) == 0 {
+		return
+	}
+
+	sortedLatencies := make([]time.Duration, len(st.latencies))
+	copy(sortedLatencies, st.latencies)
+
+	for i := 0; i < len(sortedLatencies); i++ {
+		for j := i + 1; j < len(sortedLatencies); j++ {
+			if sortedLatencies[i] > sortedLatencies[j] {
+				sortedLatencies[i], sortedLatencies[j] = sortedLatencies[j], sortedLatencies[i]
+			}
+		}
+	}
+
+	st.p50 = sortedLatencies[len(sortedLatencies)*50/100]
+	st.p95 = sortedLatencies[len(sortedLatencies)*95/100]
+	st.p99 = sortedLatencies[len(sortedLatencies)*99/100]
+
+	errorCount := 0
+	for _, e := range st.errors {
+		if e {
+			errorCount++
+		}
+	}
+	st.errorRate = float64(errorCount) / float64(len(st.errors))
+
+	if st.p50 > st.config.P50Target || st.p95 > st.config.P95Target ||
+	   st.p99 > st.config.P99Target || st.errorRate > st.config.ErrorRateThreshold {
+		st.violations++
+	}
+
+	st.lastEvaluation = time.Now()
+}
+
+func (st *SLOTracker) GetMetrics() map[string]interface{} {
+	st.mu.RLock()
+	defer st.mu.RUnlock()
+
+	return map[string]interface{}{
+		"p50_ms":           st.p50.Milliseconds(),
+		"p95_ms":           st.p95.Milliseconds(),
+		"p99_ms":           st.p99.Milliseconds(),
+		"error_rate":       st.errorRate,
+		"violations":       st.violations,
+		"total_requests":   atomic.LoadInt64(&st.totalRequests),
+		"slo_compliance":   st.getCompliance(),
+	}
+}
+
+func (st *SLOTracker) getCompliance() float64 {
+	if st.totalRequests == 0 {
+		return 100.0
+	}
+	return (1.0 - float64(st.violations)/float64(st.totalRequests)) * 100.0
+}
+
+func (st *SLOTracker) IsPerformanceBottleneck(latency time.Duration) bool {
+	return latency > st.config.LatencyThreshold
+}
+
+func (st *SLOTracker) DetectQualityDegradation() bool {
+	st.mu.RLock()
+	defer st.mu.RUnlock()
+
+	if len(st.errors) < 100 {
+		return false
+	}
+
+	recentErrors := st.errors[len(st.errors)-100:]
+	recentErrorCount := 0
+	for _, e := range recentErrors {
+		if e {
+			recentErrorCount++
+		}
+	}
+
+	recentErrorRate := float64(recentErrorCount) / 100.0
+	return recentErrorRate > st.config.ErrorRateThreshold * 2
+}
+
+func calculateEmbeddingCost(modelID string, embeddingCount int, dimensions int) *CostMetrics {
+	calculator := costCalculator
+	if calculator == nil || !calculator.IsEnabled() {
+		return nil
+	}
+
+	estimatedTokens := embeddingCount * (dimensions / 4)
+
+	metrics, _ := calculator.CalculateCost(modelID, estimatedTokens, 0)
+	if metrics != nil {
+		metrics.PricingTier = "embedding"
+	}
+	return metrics
 }
