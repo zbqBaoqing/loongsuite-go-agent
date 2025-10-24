@@ -110,6 +110,9 @@ func (h *AILLMAttrsExtractor[REQUEST, RESPONSE, GETTER1, GETTER2]) OnEnd(attribu
 		Key:   semconv.GenAIResponseModelKey,
 		Value: attribute.StringValue(h.LLMGetter.GetAIResponseModel(request, response)),
 	}, attribute.KeyValue{
+		Key:   semconv.GenAIUsageInputTokensKey,
+		Value: attribute.Int64Value(h.LLMGetter.GetAIUsageInputTokens(request)),
+	}, attribute.KeyValue{
 		Key:   semconv.GenAIUsageOutputTokensKey,
 		Value: attribute.Int64Value(h.LLMGetter.GetAIUsageOutputTokens(request, response)),
 	}, attribute.KeyValue{

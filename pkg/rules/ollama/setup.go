@@ -18,11 +18,11 @@ import (
 	"context"
 	_ "unsafe"
 
+	"github.com/alibaba/loongsuite-go-agent/pkg/api"
+	"github.com/alibaba/loongsuite-go-agent/pkg/inst-api-semconv/instrumenter/ai"
+	ollamaapi "github.com/ollama/ollama/api"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
-
-	"github.com/alibaba/loongsuite-go-agent/pkg/api"
-	ollamaapi "github.com/ollama/ollama/api"
 )
 
 
@@ -45,34 +45,6 @@ func clientGenerateOnEnter(call api.CallContext, c *ollamaapi.Client, ctx contex
 	var wrappedFn ollamaapi.GenerateResponseFunc = func(resp ollamaapi.GenerateResponse) error {
 		if isStreaming && streamState != nil {
 			streamState.recordChunk(resp.Response, resp.EvalCount)
-
-			if span := trace.SpanFromContext(ctx); span.IsRecording() {
-				if streamState.chunkCount == 1 && resp.Response != "" {
-					span.AddEvent("First token received",
-						trace.WithAttributes(
-							attribute.Int64("gen_ai.response.ttft_ms", streamState.getTTFTMillis()),
-							attribute.Int("chunk_number", streamState.chunkCount),
-						))
-				}
-
-				if streamState.shouldRecordEvent() {
-					span.AddEvent("Streaming progress",
-						trace.WithAttributes(
-							attribute.Int("chunk_count", streamState.chunkCount),
-							attribute.Int("tokens_generated", streamState.runningTokenCount),
-							attribute.String("content_preview", streamState.responseBuilder.String()),
-						))
-				}
-
-				if resp.Done {
-					span.AddEvent("Streaming completed",
-						trace.WithAttributes(
-							attribute.Int("total_chunks", streamState.chunkCount),
-							attribute.Int("total_tokens", resp.EvalCount),
-							attribute.Float64("tokens_per_second", streamState.tokenRate),
-						))
-				}
-			}
 
 			if resp.Done {
 				streamState.finalize(resp.PromptEvalCount, resp.EvalCount, resp.TotalDuration)
@@ -157,6 +129,10 @@ func clientGenerateOnExit(call api.CallContext, err error) {
 			}
 		}
 	}
+	// Set TTFT in context for metrics if streaming
+	if isStreaming && streamState != nil && streamState.firstTokenTime != nil {
+		ctx = context.WithValue(ctx, ai.TimeToFirstTokenKey{}, *streamState.firstTokenTime)
+	}
 	ollamaInstrumenter.End(ctx, *reqPtr, ollamaResp, err)
 }
 
@@ -180,34 +156,6 @@ func clientChatOnEnter(call api.CallContext, c *ollamaapi.Client, ctx context.Co
 	var wrappedFn ollamaapi.ChatResponseFunc = func(resp ollamaapi.ChatResponse) error {
 		if isStreaming && streamState != nil {
 			streamState.recordChunk(resp.Message.Content, resp.EvalCount)
-
-			if span := trace.SpanFromContext(ctx); span.IsRecording() {
-				if streamState.chunkCount == 1 && resp.Message.Content != "" {
-					span.AddEvent("First token received",
-						trace.WithAttributes(
-							attribute.Int64("gen_ai.response.ttft_ms", streamState.getTTFTMillis()),
-							attribute.Int("chunk_number", streamState.chunkCount),
-						))
-				}
-
-				if streamState.shouldRecordEvent() {
-					span.AddEvent("Streaming progress",
-						trace.WithAttributes(
-							attribute.Int("chunk_count", streamState.chunkCount),
-							attribute.Int("tokens_generated", streamState.runningTokenCount),
-							attribute.String("content_preview", streamState.responseBuilder.String()),
-						))
-				}
-
-				if resp.Done {
-					span.AddEvent("Streaming completed",
-						trace.WithAttributes(
-							attribute.Int("total_chunks", streamState.chunkCount),
-							attribute.Int("total_tokens", resp.EvalCount),
-							attribute.Float64("tokens_per_second", streamState.tokenRate),
-						))
-				}
-			}
 
 			if resp.Done {
 				streamState.finalize(resp.PromptEvalCount, resp.EvalCount, resp.TotalDuration)
@@ -291,6 +239,10 @@ func clientChatOnExit(call api.CallContext, err error) {
 				}
 			}
 		}
+	}
+	// Set TTFT in context for metrics if streaming
+	if isStreaming && streamState != nil && streamState.firstTokenTime != nil {
+		ctx = context.WithValue(ctx, ai.TimeToFirstTokenKey{}, *streamState.firstTokenTime)
 	}
 	ollamaInstrumenter.End(ctx, *reqPtr, ollamaResp, err)
 }

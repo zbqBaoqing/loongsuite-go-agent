@@ -154,6 +154,7 @@ func BuildOllamaLLMInstrumenter() instrumenter.Instrumenter[ollamaRequest, ollam
 			Name:    OLLAMA_SCOPE_NAME,
 			Version: version.Tag,
 		}).
+		AddOperationListeners(ai.AIClientMetrics("ollama")).
 		BuildInstrumenter()
 }
 
