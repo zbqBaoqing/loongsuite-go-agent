@@ -105,6 +105,14 @@ func RunCmd(args ...string) error {
 }
 
 func CopyFile(src, dst string) error {
+	_, err := os.Stat(filepath.Dir(dst))
+	if os.IsNotExist(err) {
+		err = os.MkdirAll(filepath.Dir(dst), 0o755)
+		if err != nil {
+			return ex.Wrap(err)
+		}
+	}
+
 	sourceFile, err := os.Open(src)
 	if err != nil {
 		return ex.Wrap(err)

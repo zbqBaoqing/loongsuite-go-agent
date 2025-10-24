@@ -5,7 +5,7 @@ name: Muzzle
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "dev" ]
     paths:
       - 'test/**'
       - 'pkg/**'

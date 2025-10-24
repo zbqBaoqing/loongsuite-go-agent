@@ -64,7 +64,7 @@ func populateDependenciesFromCmd(compileCmds []string) map[string]bool {
 
 	for _, cmd := range compileCmds {
 		cmdArgs := util.SplitCompileCmds(cmd)
-		importPath := findFlagValue(cmdArgs, util.BuildPattern)
+		importPath := util.FindFlagValue(cmdArgs, util.BuildPattern)
 		util.Assert(importPath != "", "sanity check")
 		projectDeps[importPath] = true
 	}
@@ -74,13 +74,6 @@ func populateDependenciesFromCmd(compileCmds []string) map[string]bool {
 	}
 
 	return projectDeps
-}
-
-type ruleHolder struct {
-	rules.InstBaseRule
-	rules.InstFileRule   //nolint:govet
-	rules.InstStructRule //nolint:govet
-	rules.InstFuncRule   //nolint:govet
 }
 
 func loadRuleFile(path string) ([]rules.InstRule, error) {
@@ -93,30 +86,44 @@ func loadRuleFile(path string) ([]rules.InstRule, error) {
 }
 
 func loadRuleRaw(content string) ([]rules.InstRule, error) {
-	var h []*ruleHolder
-	err := json.Unmarshal([]byte(content), &h)
-	if err != nil {
+	var rawMessages []json.RawMessage
+	if err := json.Unmarshal([]byte(content), &rawMessages); err != nil {
 		return nil, ex.Wrap(err)
 	}
-	rules := make([]rules.InstRule, 0)
-	for _, rule := range h {
-		if rule.StructType != "" {
-			r := &rule.InstStructRule
-			r.InstBaseRule = rule.InstBaseRule
-			rules = append(rules, r)
-		} else if rule.Function != "" {
-			r := &rule.InstFuncRule
-			r.InstBaseRule = rule.InstBaseRule
-			rules = append(rules, r)
-		} else if rule.FileName != "" {
-			r := &rule.InstFileRule
-			r.InstBaseRule = rule.InstBaseRule
-			rules = append(rules, r)
-		} else {
-			util.ShouldNotReachHereT("invalid rule type")
+
+	rulesSlice := make([]rules.InstRule, 0, len(rawMessages))
+	for _, raw := range rawMessages {
+		var obj map[string]interface{}
+		if err := json.Unmarshal(raw, &obj); err != nil {
+			return nil, ex.Wrap(err)
 		}
+
+		var rule rules.InstRule
+		if _, ok := obj["Function"]; ok {
+			var funcRule rules.InstFuncRule
+			if err := json.Unmarshal(raw, &funcRule); err != nil {
+				return nil, ex.Wrap(err)
+			}
+			rule = &funcRule
+		} else if _, ok := obj["StructType"]; ok {
+			var structRule rules.InstStructRule
+			if err := json.Unmarshal(raw, &structRule); err != nil {
+				return nil, ex.Wrap(err)
+			}
+			rule = &structRule
+		} else if _, ok := obj["FileName"]; ok {
+			var fileRule rules.InstFileRule
+			if err := json.Unmarshal(raw, &fileRule); err != nil {
+				return nil, ex.Wrap(err)
+			}
+			rule = &fileRule
+		} else {
+			return nil, ex.Newf("unknown rule type: %s", string(raw))
+		}
+		rulesSlice = append(rulesSlice, rule)
 	}
-	return rules, nil
+
+	return rulesSlice, nil
 }
 
 type chunk []rules.InstRule
@@ -318,7 +325,7 @@ func (rm *ruleMatcher) matchDependencies(rule rules.InstRule) bool {
 		return true
 	}
 
-	dependencies := funcRule.GetDependencies()
+	dependencies := funcRule.Dependencies
 	if len(dependencies) == 0 {
 		return true // No dependencies required
 	}
@@ -338,7 +345,7 @@ func (rm *ruleMatcher) matchDependencies(rule rules.InstRule) bool {
 // match gives compilation arguments and finds out all interested rules
 // for it.
 func (rm *ruleMatcher) match(cmdArgs []string) *rules.InstRuleSet {
-	importPath := findFlagValue(cmdArgs, util.BuildPattern)
+	importPath := util.FindFlagValue(cmdArgs, util.BuildPattern)
 	util.Assert(importPath != "", "sanity check")
 	if config.GetConf().Verbose {
 		util.Log("RunMatch: %v (%v)", importPath, cmdArgs)
@@ -367,7 +374,7 @@ func (rm *ruleMatcher) match(cmdArgs []string) *rules.InstRuleSet {
 	parsedAst := make(map[string]*dst.File)
 	bundle := rules.NewInstRuleSet(importPath)
 
-	goVersion := findFlagValue(cmdArgs, util.BuildGoVer)
+	goVersion := util.FindFlagValue(cmdArgs, util.BuildGoVer)
 	util.Assert(goVersion != "", "sanity check")
 	util.Assert(strings.HasPrefix(goVersion, "go"), "sanity check")
 	goVersion = strings.Replace(goVersion, "go", "v", 1)
@@ -476,15 +483,6 @@ func (rm *ruleMatcher) match(cmdArgs []string) *rules.InstRuleSet {
 		}
 	}
 	return bundle
-}
-
-func findFlagValue(cmd []string, flag string) string {
-	for i, v := range cmd {
-		if v == flag {
-			return cmd[i+1]
-		}
-	}
-	return ""
 }
 
 // vendorModule represents a module in vendor/modules.txt file, it contains

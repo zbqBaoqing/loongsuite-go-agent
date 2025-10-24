@@ -15,8 +15,6 @@
 package instrument
 
 import (
-	"path/filepath"
-
 	"github.com/alibaba/loongsuite-go-agent/tool/ast"
 	"github.com/alibaba/loongsuite-go-agent/tool/ex"
 	"github.com/alibaba/loongsuite-go-agent/tool/rules"
@@ -31,35 +29,12 @@ func (rp *RuleProcessor) addStructField(rule *rules.InstStructRule, decl dst.Dec
 	ast.AddStructField(decl, rule.FieldName, rule.FieldType)
 }
 
-func (rp *RuleProcessor) applyStructRules(bundle *rules.InstRuleSet) error {
-	for file, stRules := range bundle.StructRules {
-		util.Assert(filepath.IsAbs(file), "file path must be absolute")
-		// Apply struct rules to the file
-		astRoot, err := rp.parseAst(file)
-		if err != nil {
-			return err
-		}
-		for _, stRule := range stRules {
-			structDecl := ast.FindStructDecl(astRoot, stRule.StructType)
-			if structDecl != nil {
-				rp.addStructField(stRule, structDecl)
-			} else {
-				return ex.Newf("struct %s not found", stRule.StructType)
-			}
-		}
-		// Once all struct rules are applied, we restore AST to file and use it
-		// in future compilation
-		newFile, err := rp.writeInstrumented(file, astRoot)
-		if err != nil {
-			return err
-		}
-		// Line directive must be placed at the beginning of the line, otherwise
-		// it will be ignored by the compiler
-		err = rp.enableLineDirective(newFile)
-		if err != nil {
-			return err
-		}
-		rp.keepForDebug(newFile)
+func (rp *RuleProcessor) applyStructRule(rule *rules.InstStructRule, root *dst.File) error {
+	structDecl := ast.FindStructDecl(root, rule.StructType)
+	if structDecl != nil {
+		rp.addStructField(rule, structDecl)
+	} else {
+		return ex.Newf("struct %s not found", rule.StructType)
 	}
 	return nil
 }

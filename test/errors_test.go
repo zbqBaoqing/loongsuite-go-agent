@@ -40,7 +40,7 @@ func TestRunErrors(t *testing.T) {
 	ExpectNotContains(t, stderr, "failed to exec")
 	ExpectNotContains(t, stderr, "baddep")
 	ExpectContains(t, stderr, "gooddep")
-	text := ReadInstrumentLog(t, filepath.Join("auxiliary", "helper.go"))
+	text := ReadInstrumentLog(t, filepath.Join("debug", "errorstest_auxiliary", "helper.go"))
 	re := regexp.MustCompile(".*OtelOnEnterTrampoline_TestSkip.*")
 	matches := re.FindAllString(text, -1)
 	if len(matches) < 1 {

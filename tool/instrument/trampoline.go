@@ -158,7 +158,7 @@ func isHookDefined(root *dst.File, rule *rules.InstFuncRule) bool {
 }
 
 func findHookFile(rule *rules.InstFuncRule) (string, error) {
-	files, err := findRuleFiles(rule)
+	files, err := listRuleFiles(rule)
 	if err != nil {
 		return "", err
 	}
@@ -178,7 +178,7 @@ func findHookFile(rule *rules.InstFuncRule) (string, error) {
 		rule.OnEnter, rule.OnExit, rule.Function, files)
 }
 
-func findRuleFiles(rule rules.InstRule) ([]string, error) {
+func listRuleFiles(rule rules.InstRule) ([]string, error) {
 	files, err := util.ListFiles(rule.GetPath())
 	if err != nil {
 		return nil, err
@@ -207,15 +207,10 @@ func getHookFunc(t *rules.InstFuncRule, onEnter bool) (*dst.FuncDecl, error) {
 	} else {
 		target = ast.FindFuncDeclWithoutRecv(astRoot, t.OnExit)
 	}
-	if target != nil {
-		return target, nil
+	if target == nil {
+		return nil, ex.Newf("hook %s or %s not found", t.OnEnter, t.OnExit)
 	}
-
-	if onEnter {
-		return nil, ex.Wrapf(err, "hook %s", t.OnEnter)
-	} else {
-		return nil, ex.Wrapf(err, "hook %s", t.OnExit)
-	}
+	return target, nil
 }
 
 func getHookParamTraits(t *rules.InstFuncRule, onEnter bool) ([]ParamTrait, error) {
@@ -384,7 +379,7 @@ func insertAtEnd(funcDecl *dst.FuncDecl, stmt dst.Stmt) {
 
 func (rp *RuleProcessor) renameTrampolineFunc(t *rules.InstFuncRule) {
 	// Randomize trampoline function names
-	rp.onEnterHookFunc.Name.Name = makeName(t, rp.rawFunc, true)
+	rp.onEnterHookFunc.Name.Name = makeName(t, rp.targetFunc, true)
 	dst.Inspect(rp.onEnterHookFunc, func(node dst.Node) bool {
 		if basicLit, ok := node.(*dst.BasicLit); ok {
 			// Replace OtelOnEnterTrampolinePlaceHolder to real hook func name
@@ -394,7 +389,7 @@ func (rp *RuleProcessor) renameTrampolineFunc(t *rules.InstFuncRule) {
 		}
 		return true
 	})
-	rp.onExitHookFunc.Name.Name = makeName(t, rp.rawFunc, false)
+	rp.onExitHookFunc.Name.Name = makeName(t, rp.targetFunc, false)
 	dst.Inspect(rp.onExitHookFunc, func(node dst.Node) bool {
 		if basicLit, ok := node.(*dst.BasicLit); ok {
 			if basicLit.Value == TrampolineOnExitNamePlaceholder {
@@ -416,17 +411,17 @@ func addCallContext(list *dst.FieldList) {
 func (rp *RuleProcessor) buildTrampolineType(onEnter bool) *dst.FieldList {
 	paramList := &dst.FieldList{List: []*dst.Field{}}
 	if onEnter {
-		if ast.HasReceiver(rp.rawFunc) {
-			recvField := dst.Clone(rp.rawFunc.Recv.List[0]).(*dst.Field)
+		if ast.HasReceiver(rp.targetFunc) {
+			recvField := dst.Clone(rp.targetFunc.Recv.List[0]).(*dst.Field)
 			paramList.List = append(paramList.List, recvField)
 		}
-		for _, field := range rp.rawFunc.Type.Params.List {
+		for _, field := range rp.targetFunc.Type.Params.List {
 			paramField := dst.Clone(field).(*dst.Field)
 			paramList.List = append(paramList.List, paramField)
 		}
 	} else {
-		if rp.rawFunc.Type.Results != nil {
-			for _, field := range rp.rawFunc.Type.Results.List {
+		if rp.targetFunc.Type.Results != nil {
+			for _, field := range rp.targetFunc.Type.Results.List {
 				retField := dst.Clone(field).(*dst.Field)
 				paramList.List = append(paramList.List, retField)
 			}
@@ -453,6 +448,34 @@ func (rp *RuleProcessor) buildTrampolineTypes() {
 	addCallContext(onExitHookFunc.Type.Params)
 }
 
+func assignString(assignStmt *dst.AssignStmt, val string) bool {
+	rhs := assignStmt.Rhs
+	if len(rhs) == 1 {
+		rhsExpr := rhs[0]
+		if basicLit, ok2 := rhsExpr.(*dst.BasicLit); ok2 {
+			if basicLit.Kind == token.STRING {
+				basicLit.Value = strconv.Quote(val)
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func assignSliceLiteral(assignStmt *dst.AssignStmt, vals []dst.Expr) bool {
+	rhs := assignStmt.Rhs
+	if len(rhs) == 1 {
+		rhsExpr := rhs[0]
+		if compositeLit, ok := rhsExpr.(*dst.CompositeLit); ok {
+			elems := compositeLit.Elts
+			elems = append(elems, vals...)
+			compositeLit.Elts = elems
+			return true
+		}
+	}
+	return false
+}
+
 // replenishCallContext replenishes the call context before hook invocation
 func (rp *RuleProcessor) replenishCallContext(onEnter bool) bool {
 	funcDecl := rp.onEnterHookFunc
@@ -467,64 +490,27 @@ func (rp *RuleProcessor) replenishCallContext(onEnter bool) bool {
 				case TrampolineFuncNameIdentifier:
 					util.Assert(onEnter, "sanity check")
 					// callContext.FuncName = "..."
-					rhs := assignStmt.Rhs
-					if len(rhs) == 1 {
-						rhsExpr := rhs[0]
-						if basicLit, ok := rhsExpr.(*dst.BasicLit); ok {
-							if basicLit.Kind == token.STRING {
-								rawFuncName := rp.rawFunc.Name.Name
-								basicLit.Value = strconv.Quote(rawFuncName)
-							} else {
-								return false // ill-formed AST
-							}
-						} else {
-							return false // ill-formed AST
-						}
-					} else {
-						return false // ill-formed AST
-					}
+					assigned := assignString(assignStmt, rp.targetFunc.Name.Name)
+					util.Assert(assigned, "sanity check")
 				case TrampolinePackageNameIdentifier:
 					util.Assert(onEnter, "sanity check")
 					// callContext.PackageName = "..."
-					rhs := assignStmt.Rhs
-					if len(rhs) == 1 {
-						rhsExpr := rhs[0]
-						if basicLit, ok := rhsExpr.(*dst.BasicLit); ok {
-							if basicLit.Kind == token.STRING {
-								pkgName := rp.target.Name.Name
-								basicLit.Value = strconv.Quote(pkgName)
-							} else {
-								return false // ill-formed AST
-							}
-						} else {
-							return false // ill-formed AST
-						}
-					} else {
-						return false // ill-formed AST
-					}
+					assigned := assignString(assignStmt, rp.target.Name.Name)
+					util.Assert(assigned, "sanity check")
 				default:
 					// callContext.Params = []interface{}{...} or
 					// callContext.(*CallContextImpl).Params[0] = &int
-					rhs := assignStmt.Rhs
-					if len(rhs) == 1 {
-						rhsExpr := rhs[0]
-						if compositeLit, ok := rhsExpr.(*dst.CompositeLit); ok {
-							elems := compositeLit.Elts
-							names := getNames(funcDecl.Type.Params)
-							for i, name := range names {
-								if i == 0 && !onEnter {
-									// SKip first callContext parameter for onExit
-									continue
-								}
-								elems = append(elems, ast.Ident(name))
-							}
-							compositeLit.Elts = elems
-						} else {
-							return false // ill-formed AST
+					names := getNames(funcDecl.Type.Params)
+					vals := make([]dst.Expr, 0, len(names))
+					for i, name := range names {
+						if i == 0 && !onEnter {
+							// SKip first callContext parameter for after
+							continue
 						}
-					} else {
-						return false // ill-formed AST
+						vals = append(vals, ast.Ident(name))
 					}
+					assigned := assignSliceLiteral(assignStmt, vals)
+					util.Assert(assigned, "sanity check")
 				}
 			}
 
@@ -635,12 +621,7 @@ func desugarType(param *dst.Field) dst.Expr {
 
 func (rp *RuleProcessor) rewriteCallContext() {
 	util.Assert(len(rp.callCtxMethods) > 4, "sanity check")
-	var (
-		methodSetParam  *dst.FuncDecl
-		methodGetParam  *dst.FuncDecl
-		methodGetRetVal *dst.FuncDecl
-		methodSetRetVal *dst.FuncDecl
-	)
+	var methodSetParam, methodGetParam, methodGetRetVal, methodSetRetVal *dst.FuncDecl
 	for _, decl := range rp.callCtxMethods {
 		switch decl.Name.Name {
 		case TrampolineSetParamName:
@@ -656,24 +637,27 @@ func (rp *RuleProcessor) rewriteCallContext() {
 	// Rewrite SetParam and GetParam methods
 	// Don't believe what you see in template.go, we will null out it and rewrite
 	// the whole switch statement
-	methodSetParamBody := methodSetParam.Body.List[1].(*dst.SwitchStmt).Body
-	methodGetParamBody := methodGetParam.Body.List[0].(*dst.SwitchStmt).Body
-	methodSetRetValBody := methodSetRetVal.Body.List[1].(*dst.SwitchStmt).Body
-	methodGetRetValBody := methodGetRetVal.Body.List[0].(*dst.SwitchStmt).Body
-	methodGetParamBody.List = nil
-	methodSetParamBody.List = nil
-	methodGetRetValBody.List = nil
-	methodSetRetValBody.List = nil
+	findSwitchBlock := func(fn *dst.FuncDecl, idx int) *dst.BlockStmt {
+		stmt, ok := fn.Body.List[idx].(*dst.SwitchStmt)
+		util.Assert(ok, "sanity check")
+		body := stmt.Body
+		body.List = nil
+		return body
+	}
+	methodSetParamBody := findSwitchBlock(methodSetParam, 1)
+	methodGetParamBody := findSwitchBlock(methodGetParam, 0)
+	methodSetRetValBody := findSwitchBlock(methodSetRetVal, 1)
+	methodGetRetValBody := findSwitchBlock(methodGetRetVal, 0)
 	idx := 0
-	if ast.HasReceiver(rp.rawFunc) {
-		recvType := rp.rawFunc.Recv.List[0].Type
+	if ast.HasReceiver(rp.targetFunc) {
+		recvType := rp.targetFunc.Recv.List[0].Type
 		clause := setParamClause(idx, recvType)
 		methodSetParamBody.List = append(methodSetParamBody.List, clause)
 		clause = getParamClause(idx, recvType)
 		methodGetParamBody.List = append(methodGetParamBody.List, clause)
 		idx++
 	}
-	for _, param := range rp.rawFunc.Type.Params.List {
+	for _, param := range rp.targetFunc.Type.Params.List {
 		paramType := desugarType(param)
 		for range param.Names {
 			clause := setParamClause(idx, paramType)
@@ -686,9 +670,9 @@ func (rp *RuleProcessor) rewriteCallContext() {
 		}
 	}
 	// Rewrite GetReturnVal and SetReturnVal methods
-	if rp.rawFunc.Type.Results != nil {
+	if rp.targetFunc.Type.Results != nil {
 		idx = 0
-		for _, retval := range rp.rawFunc.Type.Results.List {
+		for _, retval := range rp.targetFunc.Type.Results.List {
 			retType := desugarType(retval)
 			for range retval.Names {
 				clause := getReturnValClause(idx, retType)

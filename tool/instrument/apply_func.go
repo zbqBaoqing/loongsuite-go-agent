@@ -20,7 +20,6 @@ import (
 	"go/parser"
 	"path/filepath"
 	"regexp"
-	"sort"
 
 	"github.com/alibaba/loongsuite-go-agent/tool/ast"
 	"github.com/alibaba/loongsuite-go-agent/tool/config"
@@ -46,23 +45,28 @@ func (rp *RuleProcessor) parseAst(filePath string) (*dst.File, error) {
 	return rp.target, nil
 }
 
-func (rp *RuleProcessor) writeInstrumented(filePath string, root *dst.File) (string, error) {
+func (rp *RuleProcessor) writeInstrumented(root *dst.File, filePath string) error {
 	rp.parser = nil
 	rp.target = nil
 	filePath = rp.tryRelocated(filePath)
 	name := filepath.Base(filePath)
 	newFile, err := ast.WriteFile(root, filepath.Join(rp.workDir, name))
 	if err != nil {
-		return "", err
+		return err
 	}
 	err = rp.replaceCompileArg(newFile, func(arg string) bool {
 		return arg == filePath
 	})
 	if err != nil {
-		return "", ex.Wrapf(err, "filePath %s, compileArgs %v, newArg %s",
+		return ex.Wrapf(err, "filePath %s, compileArgs %v, newArg %s",
 			filePath, rp.compileArgs, newFile)
 	}
-	return newFile, nil
+	err = rp.enableLineDirective(newFile)
+	if err != nil {
+		return err
+	}
+	rp.keepForDebug(newFile)
+	return nil
 }
 
 func makeName(r *rules.InstFuncRule,
@@ -281,11 +285,7 @@ func (rp *RuleProcessor) insertTJump(t *rules.InstFuncRule,
 	// hook context for the real hook code. Once all preparations are done, it
 	// jumps to the real hook code. Note that each trampoline has its own hook
 	// context implementation, which is generated dynamically.
-	err := rp.createTrampoline(t)
-	if err != nil {
-		return err
-	}
-	return nil
+	return rp.createTrampoline(t)
 }
 
 func (rp *RuleProcessor) insertRaw(r *rules.InstFuncRule, decl *dst.FuncDecl) error {
@@ -324,13 +324,6 @@ func nameReturnValues(funcDecl *dst.FuncDecl) {
 			}
 		}
 	}
-}
-
-func sortFuncRules(fnRules []*rules.InstFuncRule) []*rules.InstFuncRule {
-	sort.SliceStable(fnRules, func(i, j int) bool {
-		return fnRules[i].Order < fnRules[j].Order
-	})
-	return fnRules
 }
 
 //go:embed api.tmpl
@@ -379,76 +372,37 @@ func (rp *RuleProcessor) enableLineDirective(filePath string) error {
 	return nil
 }
 
-func (rp *RuleProcessor) applyFuncRules(bundle *rules.InstRuleSet) (err error) {
-	// Nothing to do if no func rules
-	if len(bundle.FuncRules) == 0 {
-		return nil
+func (rp *RuleProcessor) applyFuncRule(rule *rules.InstFuncRule, root *dst.File) (err error) {
+	funcDecls := ast.FindFuncDecl(root, rule.Function, rule.ReceiverType)
+	if len(funcDecls) == 0 {
+		return ex.Newf("func %s not found", rule.Function)
 	}
-	// Applied all matched func rules, either inserting raw code or inserting
-	// our trampoline calls.
-	for file, funcRules := range bundle.FuncRules {
-		util.Assert(filepath.IsAbs(file), "file path must be absolute")
-		astRoot, err := rp.parseAst(file)
-		if err != nil {
-			return err
-		}
-		rp.trampolineJumps = make([]*TJump, 0)
-		for _, rule := range sortFuncRules(funcRules) {
-			funcDecls := ast.FindFuncDecl(astRoot, rule.Function, rule.ReceiverType)
-			if len(funcDecls) == 0 {
-				return ex.Newf("func %s not found", rule.Function)
-			}
-			for _, funcDecl := range funcDecls {
-				util.Assert(funcDecl.Body != nil, "target func body is empty")
-				fnName := funcDecl.Name.Name
-				// Save raw function declaration
-				rp.rawFunc = funcDecl
-				// The func rule can either fully match the target function
-				// or use a regexp to match a batch of functions. The
-				// generation of tjump differs slightly between these two
-				// cases. In the former case, the hook function is required
-				// to have the same signature as the target function, while
-				// the latter does not have this requirement.
-				rp.exact = fnName == rule.Function
-				// Add explicit names for return values, they can be further
-				// referenced if we're willing
-				nameReturnValues(funcDecl)
+	for _, funcDecl := range funcDecls {
+		util.Assert(funcDecl.Body != nil, "target func body is empty")
+		fnName := funcDecl.Name.Name
+		// Save raw function declaration
+		rp.targetFunc = funcDecl
+		// The func rule can either fully match the target function
+		// or use a regexp to match a batch of functions. The
+		// generation of tjump differs slightly between these two
+		// cases. In the former case, the hook function is required
+		// to have the same signature as the target function, while
+		// the latter does not have this requirement.
+		rp.exact = fnName == rule.Function
+		// Add explicit names for return values, they can be further
+		// referenced if we're willing
+		nameReturnValues(funcDecl)
 
-				// Apply all matched rules for this function
-				if rule.UseRaw {
-					err = rp.insertRaw(rule, funcDecl)
-				} else {
-					err = rp.insertTJump(rule, funcDecl)
-				}
-				if err != nil {
-					return err
-				}
-				util.Log("Apply func rule %s (%v)", rule, rp.compileArgs)
-			}
+		// Apply all matched rules for this function
+		if rule.UseRaw {
+			err = rp.insertRaw(rule, funcDecl)
+		} else {
+			err = rp.insertTJump(rule, funcDecl)
 		}
-		// Optimize generated trampoline-jump-ifs
-		err = rp.optimizeTJumps()
 		if err != nil {
 			return err
 		}
-		// Write the instrumented AST to new file and replace the original
-		// file in the compile command
-		newFile, err := rp.writeInstrumented(file, astRoot)
-		if err != nil {
-			return err
-		}
-		// Line directive must be placed at the beginning of the line, otherwise
-		// it will be ignored by the compiler
-		err = rp.enableLineDirective(newFile)
-		if err != nil {
-			return err
-		}
-		rp.keepForDebug(newFile)
-	}
-
-	err = rp.writeGlobals(bundle.PackageName)
-	if err != nil {
-		return err
+		util.Log("Apply func rule %s (%v)", rule, rp.compileArgs)
 	}
 	return nil
 }
