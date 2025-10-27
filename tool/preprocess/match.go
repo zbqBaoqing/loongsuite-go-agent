@@ -63,7 +63,7 @@ func populateDependenciesFromCmd(compileCmds []string) map[string]bool {
 	projectDeps := make(map[string]bool)
 
 	for _, cmd := range compileCmds {
-		cmdArgs := util.SplitCmds(cmd)
+		cmdArgs := util.SplitCompileCmds(cmd)
 		importPath := findFlagValue(cmdArgs, util.BuildPattern)
 		util.Assert(importPath != "", "sanity check")
 		projectDeps[importPath] = true
@@ -337,7 +337,7 @@ func (rm *ruleMatcher) matchDependencies(rule rules.InstRule) bool {
 
 // match gives compilation arguments and finds out all interested rules
 // for it.
-func (rm *ruleMatcher) match(cmdArgs []string) *rules.RuleBundle {
+func (rm *ruleMatcher) match(cmdArgs []string) *rules.InstRuleSet {
 	importPath := findFlagValue(cmdArgs, util.BuildPattern)
 	util.Assert(importPath != "", "sanity check")
 	if config.GetConf().Verbose {
@@ -365,7 +365,7 @@ func (rm *ruleMatcher) match(cmdArgs []string) *rules.RuleBundle {
 	}
 
 	parsedAst := make(map[string]*dst.File)
-	bundle := rules.NewRuleBundle(importPath)
+	bundle := rules.NewInstRuleSet(importPath)
 
 	goVersion := findFlagValue(cmdArgs, util.BuildGoVer)
 	util.Assert(goVersion != "", "sanity check")
@@ -376,7 +376,11 @@ func (rm *ruleMatcher) match(cmdArgs []string) *rules.RuleBundle {
 		if !util.IsGoFile(candidate) {
 			continue
 		}
-		file := candidate
+		file, err := filepath.Abs(candidate)
+		if err != nil {
+			util.Log("Failed to get absolute path of file %s: %v", candidate, err)
+			continue
+		}
 
 		// If it's a vendor build, we need to extract the version of the module
 		// from vendor/modules.txt, otherwise we find the version from source
@@ -387,6 +391,30 @@ func (rm *ruleMatcher) match(cmdArgs []string) *rules.RuleBundle {
 			if recorded != "" {
 				version = recorded
 			}
+		}
+
+		// Fair enough, parse the file content. Since this is a heavy operation,
+		// we cache the parsed AST to avoid redundant parsing.
+		var tree *dst.File
+		if _, ok := parsedAst[file]; !ok {
+			fileAst, err := ast.ParseFileFast(file)
+			if fileAst == nil || err != nil {
+				util.Log("failed to parse file %s: %v", file, err)
+				continue
+			}
+			parsedAst[file] = fileAst
+			util.Assert(fileAst.Name.Name != "", "empty package name")
+			bundle.SetPackageName(fileAst.Name.Name)
+			tree = fileAst
+		} else {
+			tree = parsedAst[file]
+		}
+
+		if tree == nil {
+			// Failed to parse the file, stop here and log only
+			// since it's a tolerant failure
+			util.Log("Failed to parse file %s", file)
+			continue
 		}
 
 		for i := len(filteredAvailables) - 1; i >= 0; i-- {
@@ -414,75 +442,32 @@ func (rm *ruleMatcher) match(cmdArgs []string) *rules.RuleBundle {
 					continue
 				}
 			}
-			// Check if it matches with file rule early as we try to avoid
-			// parsing the file content, which is time consuming
-			if _, ok := rule.(*rules.InstFileRule); ok {
-				ast, err := ast.ParseFileOnlyPackage(file)
-				if ast == nil || err != nil {
-					util.Log("Failed to parse %s: %v", file, err)
-					continue
-				}
-				util.Log("Match file rule %s", rule)
-				bundle.AddFileRule(rule.(*rules.InstFileRule))
-				bundle.SetPackageName(ast.Name.Name)
-				filteredAvailables = append(filteredAvailables[:i], filteredAvailables[i+1:]...)
-				continue
-			}
-
-			// Fair enough, parse the file content
-			var tree *dst.File
-			if _, ok := parsedAst[file]; !ok {
-				fileAst, err := ast.ParseFileFast(file)
-				if fileAst == nil || err != nil {
-					util.Log("failed to parse file %s: %v", file, err)
-					continue
-				}
-				parsedAst[file] = fileAst
-				util.Assert(fileAst.Name.Name != "", "empty package name")
-				bundle.SetPackageName(fileAst.Name.Name)
-				tree = fileAst
-			} else {
-				tree = parsedAst[file]
-			}
-
-			if tree == nil {
-				// Failed to parse the file, stop here and log only
-				// since it's a tolerant failure
-				util.Log("Failed to parse file %s", file)
-				continue
-			}
 
 			// Let's match with the rule precisely
 			valid := false
-			for _, decl := range tree.Decls {
-				if genDecl, ok := decl.(*dst.GenDecl); ok {
-					if rl, ok := rule.(*rules.InstStructRule); ok {
-						if ast.MatchStructDecl(genDecl, rl.StructType) {
-							util.Log("Match struct rule %s with %v",
-								rule, cmdArgs)
-							err = bundle.AddFile2StructRule(file, rl)
-							if err != nil {
-								util.Log("Failed to add struct rule: %v", err)
-								continue
-							}
-							valid = true
-							break
-						}
-					}
-				} else if funcDecl, ok := decl.(*dst.FuncDecl); ok {
-					if rl, ok := rule.(*rules.InstFuncRule); ok {
-						if ast.MatchFuncDecl(funcDecl, rl.Function, rl.ReceiverType) {
-							util.Log("Match func rule %s with %v", rule, cmdArgs)
-							err = bundle.AddFile2FuncRule(file, rl)
-							if err != nil {
-								util.Log("Failed to add func rule: %v", err)
-								continue
-							}
-							valid = true
-							break
-						}
-					}
+			switch rl := rule.(type) {
+			case *rules.InstFuncRule:
+				funcDecls := ast.FindFuncDecl(tree, rl.Function, rl.ReceiverType)
+				if len(funcDecls) > 0 {
+					bundle.AddFuncRule(file, rl)
+					util.Log("Match func rule %s with %v", rule, cmdArgs)
+					valid = true
 				}
+			case *rules.InstStructRule:
+				genDecl := ast.FindStructDecl(tree, rl.StructType)
+				if genDecl != nil {
+					bundle.AddStructRule(file, rl)
+					util.Log("Match struct rule %s with %v", rule, cmdArgs)
+					valid = true
+				}
+			case *rules.InstFileRule:
+				// File rule is always matched
+				util.Log("Match file rule %s with %v", rule, cmdArgs)
+				bundle.AddFileRule(rl)
+				bundle.SetPackageName(tree.Name.Name)
+				valid = true
+			default:
+				util.ShouldNotReachHereT("invalid rule type")
 			}
 			if valid {
 				// Remove the rule from the available rules
@@ -632,12 +617,12 @@ func parseVendorModules(projDir string) ([]*vendorModule, error) {
 	return vms, nil
 }
 
-func runMatch(matcher *ruleMatcher, cmd string, ch chan *rules.RuleBundle) {
-	bundle := matcher.match(util.SplitCmds(cmd))
+func runMatch(matcher *ruleMatcher, cmd string, ch chan *rules.InstRuleSet) {
+	bundle := matcher.match(util.SplitCompileCmds(cmd))
 	ch <- bundle
 }
 
-func (dp *DepProcessor) matchRules() ([]*rules.RuleBundle, error) {
+func (dp *DepProcessor) matchRules() ([]*rules.InstRuleSet, error) {
 	defer util.PhaseTimer("Match")()
 	compileCmds, err := dp.findDeps()
 	if err != nil {
@@ -660,12 +645,12 @@ func (dp *DepProcessor) matchRules() ([]*rules.RuleBundle, error) {
 	}
 
 	// Find used instrumentation rule according to compile commands
-	ch := make(chan *rules.RuleBundle)
+	ch := make(chan *rules.InstRuleSet)
 	for _, cmd := range compileCmds {
 		go runMatch(matcher, cmd, ch)
 	}
 	cnt := 0
-	bundles := make([]*rules.RuleBundle, 0)
+	bundles := make([]*rules.InstRuleSet, 0)
 	for cnt < len(compileCmds) {
 		bundle := <-ch
 		if bundle.IsValid() {

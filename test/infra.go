@@ -180,7 +180,20 @@ func RunApp(t *testing.T, appName string, env ...string) (string, string) {
 	cmd := runCmd([]string{"./" + appName})
 	cmd.Env = os.Environ()
 	cmd.Env = append(cmd.Env, env...)
-	cmd.Env = append(cmd.Env, "IN_OTEL_TEST=true")
+	
+	// Check if user has explicitly set IN_OTEL_TEST
+	// If not, default to `true`
+	hasTestFlag := false
+	for i := len(cmd.Env) - 1; i >= 0; i-- {
+		if strings.HasPrefix(cmd.Env[i], "IN_OTEL_TEST=") {
+			hasTestFlag = true
+			break
+		}
+	}
+	if !hasTestFlag {
+		cmd.Env = append(cmd.Env, "IN_OTEL_TEST=true")
+	}
+	
 	err := cmd.Run()
 	stdoutText := readStdoutLog(t)
 	stderrText := readStderrLog(t)

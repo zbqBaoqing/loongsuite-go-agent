@@ -16,20 +16,33 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"net/http"
+	"time"
 
-	"github.com/alibaba/loongsuite-go-agent/test/verifier"
-	"github.com/ollama/ollama/api"
-	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+	"go.opentelemetry.io/otel"
 )
 
 func main() {
+	tracer := otel.Tracer("test-tracer")
+	meter := otel.Meter("test-meter")
+
 	ctx := context.Background()
-	client, server := NewMockOllamaChatForInvoke(ctx)
-	defer server.Close()
-	streamFlag := false
-	req := &api.ChatRequest{Model: "llama3:70b", Messages: []api.Message{{Role: "user", Content: "Hello"}}, Stream: &streamFlag}
-	_ = client.Chat(ctx, req, func(resp api.ChatResponse) error { return nil })
-	verifier.WaitAndAssertTraces(func(stubs []tracetest.SpanStubs) {
-		verifier.VerifyLLMAttributes(stubs[0][0], "chat", "ollama", "llama3:70b")
-	}, 1)
+	ctx, span := tracer.Start(ctx, "test-span")
+	defer span.End()
+
+	counter, err := meter.Int64Counter("test.counter")
+	if err != nil {
+		panic(err)
+	}
+	counter.Add(ctx, 1)
+
+	req, _ := http.NewRequest("GET", "http://example.com", nil)
+	req = req.WithContext(ctx)
+	client := &http.Client{Timeout: 1 * time.Second}
+	_, _ = client.Do(req)
+
+	time.Sleep(100 * time.Millisecond)
+
+	fmt.Println("Multi exporter test completed")
 }

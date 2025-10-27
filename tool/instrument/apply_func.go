@@ -21,7 +21,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
-	"strings"
 
 	"github.com/alibaba/loongsuite-go-agent/tool/ast"
 	"github.com/alibaba/loongsuite-go-agent/tool/config"
@@ -380,62 +379,51 @@ func (rp *RuleProcessor) enableLineDirective(filePath string) error {
 	return nil
 }
 
-func (rp *RuleProcessor) applyFuncRules(bundle *rules.RuleBundle) (err error) {
+func (rp *RuleProcessor) applyFuncRules(bundle *rules.InstRuleSet) (err error) {
 	// Nothing to do if no func rules
-	if len(bundle.File2FuncRules) == 0 {
+	if len(bundle.FuncRules) == 0 {
 		return nil
 	}
 	// Applied all matched func rules, either inserting raw code or inserting
 	// our trampoline calls.
-	for file, fn2rules := range bundle.File2FuncRules {
+	for file, funcRules := range bundle.FuncRules {
 		util.Assert(filepath.IsAbs(file), "file path must be absolute")
 		astRoot, err := rp.parseAst(file)
 		if err != nil {
 			return err
 		}
 		rp.trampolineJumps = make([]*TJump, 0)
-		// Since we may generate many functions into the same file, while we don't
-		// want to further instrument these functions, we need to make sure that
-		// the generated function are excluded from the instrumented file.
-		oldDecls := make([]dst.Decl, len(astRoot.Decls))
-		copy(oldDecls, astRoot.Decls)
-		for fnName, rules := range fn2rules {
-			for _, decl := range oldDecls {
-				nameAndRecvType := strings.Split(fnName, ",")
-				name := nameAndRecvType[0]
-				recvType := nameAndRecvType[1]
-				if ast.MatchFuncDecl(decl, name, recvType) {
-					fnDecl := decl.(*dst.FuncDecl)
-					util.Assert(fnDecl.Body != nil, "target func body is empty")
-					fnName := fnDecl.Name.Name
-					// Save raw function declaration
-					rp.rawFunc = fnDecl
-					// The func rule can either fully match the target function
-					// or use a regexp to match a batch of functions. The
-					// generation of tjump differs slightly between these two
-					// cases. In the former case, the hook function is required
-					// to have the same signature as the target function, while
-					// the latter does not have this requirement.
-					rp.exact = fnName == name
-					// Add explicit names for return values, they can be further
-					// referenced if we're willing
-					nameReturnValues(fnDecl)
+		for _, rule := range sortFuncRules(funcRules) {
+			funcDecls := ast.FindFuncDecl(astRoot, rule.Function, rule.ReceiverType)
+			if len(funcDecls) == 0 {
+				return ex.Newf("func %s not found", rule.Function)
+			}
+			for _, funcDecl := range funcDecls {
+				util.Assert(funcDecl.Body != nil, "target func body is empty")
+				fnName := funcDecl.Name.Name
+				// Save raw function declaration
+				rp.rawFunc = funcDecl
+				// The func rule can either fully match the target function
+				// or use a regexp to match a batch of functions. The
+				// generation of tjump differs slightly between these two
+				// cases. In the former case, the hook function is required
+				// to have the same signature as the target function, while
+				// the latter does not have this requirement.
+				rp.exact = fnName == rule.Function
+				// Add explicit names for return values, they can be further
+				// referenced if we're willing
+				nameReturnValues(funcDecl)
 
-					// Apply all matched rules for this function
-					fnRules := sortFuncRules(rules)
-					for _, rule := range fnRules {
-						if rule.UseRaw {
-							err = rp.insertRaw(rule, fnDecl)
-						} else {
-							err = rp.insertTJump(rule, fnDecl)
-						}
-						if err != nil {
-							return err
-						}
-						util.Log("Apply func rule %s (%v)", rule, rp.compileArgs)
-					}
-					// break
+				// Apply all matched rules for this function
+				if rule.UseRaw {
+					err = rp.insertRaw(rule, funcDecl)
+				} else {
+					err = rp.insertTJump(rule, funcDecl)
 				}
+				if err != nil {
+					return err
+				}
+				util.Log("Apply func rule %s (%v)", rule, rp.compileArgs)
 			}
 		}
 		// Optimize generated trampoline-jump-ifs

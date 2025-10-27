@@ -24,12 +24,14 @@ import (
 
 func main() {
 	ctx := context.Background()
-	client, server := NewMockOllamaChatForInvoke(ctx)
+	client, server := NewMockOllamaGenerateForInvoke(ctx)
 	defer server.Close()
-	streamFlag := false
-	req := &api.ChatRequest{Model: "llama3:70b", Messages: []api.Message{{Role: "user", Content: "Hello"}}, Stream: &streamFlag}
-	_ = client.Chat(ctx, req, func(resp api.ChatResponse) error { return nil })
+	_, _ = client.List(ctx)
+	_, _ = client.Show(ctx, &api.ShowRequest{Model: "llama3:8b"})
+	_ = client.Pull(ctx, &api.PullRequest{Model: "llama3:8b"}, func(resp api.ProgressResponse) error { return nil })
+	_ = client.Delete(ctx, &api.DeleteRequest{Model: "llama3:8b"})
+	_ = client.Copy(ctx, &api.CopyRequest{Source: "llama3:8b", Destination: "llama3-copy"})
 	verifier.WaitAndAssertTraces(func(stubs []tracetest.SpanStubs) {
-		verifier.VerifyLLMAttributes(stubs[0][0], "chat", "ollama", "llama3:70b")
-	}, 1)
+		verifier.VerifyLLMAttributes(stubs[0][0], "list", "ollama", "")
+	}, 5)
 }

@@ -154,8 +154,10 @@ func TestAILLMAttrsExtractorEnd(t *testing.T) {
 	assert.Equal(t, "chatcmpl-123", attrs[1].Value.AsString())
 	assert.Equal(t, semconv.GenAIResponseModelKey, attrs[2].Key)
 	assert.Equal(t, "deepseek:17b", attrs[2].Value.AsString())
-	assert.Equal(t, semconv.GenAIUsageOutputTokensKey, attrs[3].Key)
+	assert.Equal(t, semconv.GenAIUsageInputTokensKey, attrs[3].Key)
 	assert.Equal(t, int64(10), attrs[3].Value.AsInt64())
-	assert.Equal(t, semconv.GenAIResponseIDKey, attrs[4].Key)
-	assert.Equal(t, "chatcmpl-123", attrs[4].Value.AsString())
+	assert.Equal(t, semconv.GenAIUsageOutputTokensKey, attrs[4].Key)
+	assert.Equal(t, int64(10), attrs[4].Value.AsInt64())
+	assert.Equal(t, semconv.GenAIResponseIDKey, attrs[5].Key)
+	assert.Equal(t, "chatcmpl-123", attrs[5].Value.AsString())
 }

@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 
 	"github.com/alibaba/loongsuite-go-agent/tool/ast"
+	"github.com/alibaba/loongsuite-go-agent/tool/ex"
 	"github.com/alibaba/loongsuite-go-agent/tool/rules"
 	"github.com/alibaba/loongsuite-go-agent/tool/util"
 	"github.com/dave/dst"
@@ -30,21 +31,20 @@ func (rp *RuleProcessor) addStructField(rule *rules.InstStructRule, decl dst.Dec
 	ast.AddStructField(decl, rule.FieldName, rule.FieldType)
 }
 
-func (rp *RuleProcessor) applyStructRules(bundle *rules.RuleBundle) error {
-	for file, struct2Rules := range bundle.File2StructRules {
+func (rp *RuleProcessor) applyStructRules(bundle *rules.InstRuleSet) error {
+	for file, stRules := range bundle.StructRules {
 		util.Assert(filepath.IsAbs(file), "file path must be absolute")
 		// Apply struct rules to the file
 		astRoot, err := rp.parseAst(file)
 		if err != nil {
 			return err
 		}
-		for _, decl := range astRoot.Decls {
-			for structName, rules := range struct2Rules {
-				if ast.MatchStructDecl(decl, structName) {
-					for _, rule := range rules {
-						rp.addStructField(rule, decl)
-					}
-				}
+		for _, stRule := range stRules {
+			structDecl := ast.FindStructDecl(astRoot, stRule.StructType)
+			if structDecl != nil {
+				rp.addStructField(stRule, structDecl)
+			} else {
+				return ex.Newf("struct %s not found", stRule.StructType)
 			}
 		}
 		// Once all struct rules are applied, we restore AST to file and use it
