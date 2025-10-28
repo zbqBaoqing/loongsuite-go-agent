@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Alibaba Group Holding Ltd.
+// Copyright (c) 2025 Alibaba Group Holding Ltd.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,13 +16,11 @@ package rpcx
 
 import (
 	"context"
+	"log"
 	_ "unsafe"
 
 	"github.com/smallnest/rpcx/client"
 	"github.com/smallnest/rpcx/protocol"
-
-	"github.com/smallnest/rpcx/log"
-	"go.opentelemetry.io/otel/sdk/trace"
 
 	"github.com/alibaba/loongsuite-go-agent/pkg/api"
 )
@@ -92,7 +90,7 @@ func clientRpcxGoOnEnter(call api.CallContext, cli *client.Client, ctx context.C
 		println("failed to exec onEnter hook", "clientRpcxCallOnEnter", "client is nil")
 		return
 	}
-	// call 方法中会调用Go方法，会导致span重复，因此不用再次创建 span
+	// The call method will invoke the Go method, which will cause the span to be duplicated. Therefore, there is no need to create the span again
 	if v := ctx.Value(iscallFuncKey); v != nil && v.(bool) {
 		data := make(map[string]interface{}, 1)
 		data["ctx"] = ctx
@@ -129,7 +127,7 @@ func clientRpcxGoOnExit(call api.CallContext, xcall *client.Call) {
 	}
 	data := call.GetData().(map[string]interface{})
 	ctx := data["ctx"].(context.Context)
-	// call 方法中会调用Go方法，会导致span重复
+
 	if v := ctx.Value(iscallFuncKey); v != nil && v.(bool) {
 		return
 	}
@@ -190,10 +188,9 @@ func clientRpcxSendRawOnExit(call api.CallContext, _ map[string]string, _ []byte
 }
 
 func logPrintf(state, servicePath, serviceMethod string, err error) {
-	traceId, spanId := trace.GetTraceAndSpanId()
 	if err != nil {
-		log.Errorf(`{"state":"%s","traceId":"%s", "spanId:"%s", "rpc.service":"%s", "rpc.method":"%s", err:%v}`, state, traceId, spanId, servicePath, serviceMethod, err)
+		log.Printf(` state=%s rpc.service=%s rpc.method=%s err=%v`, state, servicePath, serviceMethod, err)
 	} else {
-		log.Infof(`{"state":"%s","traceId":"%s", "spanId:"%s", "rpc.service":"%s", "rpc.method":"%s"}`, state, traceId, spanId, servicePath, serviceMethod)
+		log.Printf(` state=%s rpc.service=%s rpc.method=%s`, state, servicePath, serviceMethod)
 	}
 }
