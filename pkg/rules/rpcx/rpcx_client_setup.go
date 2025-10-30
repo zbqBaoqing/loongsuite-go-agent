@@ -38,7 +38,6 @@ func clientRpcxCallOnEnter(call api.CallContext, cli *client.Client, ctx context
 		return
 	}
 	if cli == nil {
-		println("failed to exec onEnter hook", "clientRpcxCallOnEnter", "client is nil")
 		return
 	}
 	xcall := new(client.Call)
@@ -87,7 +86,6 @@ func clientRpcxGoOnEnter(call api.CallContext, cli *client.Client, ctx context.C
 		return
 	}
 	if cli == nil {
-		println("failed to exec onEnter hook", "clientRpcxCallOnEnter", "client is nil")
 		return
 	}
 	// The call method will invoke the Go method, which will cause the span to be duplicated. Therefore, there is no need to create the span again
@@ -149,7 +147,6 @@ func clientRpcxSendRawOnEnter(call api.CallContext, cli *client.Client, ctx cont
 		return
 	}
 	if cli == nil {
-		println("failed to exec onEnter hook", "clientRpcxCallOnEnter", "client is nil")
 		return
 	}
 	xcall := new(client.Call)
