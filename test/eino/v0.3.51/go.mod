@@ -2,9 +2,9 @@ module eino
 
 go 1.23.9
 
-replace github.com/alibaba/loongsuite-go-agent/test/verifier => ../../../../loongsuite-go-agent/test/verifier
+replace github.com/alibaba/loongsuite-go-agent/test/verifier => ../../verifier
 
-replace github.com/alibaba/loongsuite-go-agent => ../../../../loongsuite-go-agent
+replace github.com/alibaba/loongsuite-go-agent => ../../..
 
 require (
 	github.com/alibaba/loongsuite-go-agent/test/verifier v0.0.0-00010101000000-000000000000

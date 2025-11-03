@@ -16,8 +16,6 @@ func init() {
 		NewGeneralTestCase("ollama-0.3.14-stream-generate-test", ollama_module_name, "0.3.14", "0.3.14", "1.22", "", TestOllamaStreamGenerate),
 		NewGeneralTestCase("ollama-0.3.14-tinyllama-generate-test", ollama_module_name, "0.3.14", "0.3.14", "1.22", "", TestTinyLlamaGenerate),
 		NewGeneralTestCase("ollama-0.3.14-llama3-chat-test", ollama_module_name, "0.3.14", "0.3.14", "1.22", "", TestLlama3Chat),
-		NewGeneralTestCase("ollama-0.3.14-cost-calculation-test", ollama_module_name, "0.3.14", "0.3.14", "1.22", "", TestOllamaCostCalculation),
-		NewGeneralTestCase("ollama-0.3.14-budget-tracking-test", ollama_module_name, "0.3.14", "0.3.14", "1.22", "", TestOllamaBudgetTracking),
 		NewGeneralTestCase("ollama-0.3.14-backward-compat-test", ollama_module_name, "0.3.14", "0.3.14", "1.22", "", TestOllamaBackwardCompat),
 		NewGeneralTestCase("ollama-0.3.14-generate-metrics-test", ollama_module_name, "0.3.14", "0.3.14", "1.22", "", TestOllamaGenerateMetrics),
 		NewGeneralTestCase("ollama-0.3.14-stream-generate-metrics-test", ollama_module_name, "0.3.14", "0.3.14", "1.22", "", TestOllamaStreamGenerateMetrics),
@@ -25,8 +23,10 @@ func init() {
 		NewGeneralTestCase("ollama-0.3.14-stream-chat-metrics-test", ollama_module_name, "0.3.14", "0.3.14", "1.22", "", TestOllamaStreamChatMetrics),
 		NewGeneralTestCase("ollama-0.3.14-embeddings-test", ollama_module_name, "0.3.14", "0.3.14", "1.22", "", TestOllamaEmbeddings),
 		NewGeneralTestCase("ollama-0.3.14-model-management-test", ollama_module_name, "0.3.14", "0.3.14", "1.22", "", TestOllamaModelManagement),
-		NewGeneralTestCase("ollama-0.3.14-slo-monitoring-test", ollama_module_name, "0.3.14", "0.3.14", "1.22", "", TestOllamaSLOMonitoring),
 		NewGeneralTestCase("ollama-0.3.14-comprehensive-test", ollama_module_name, "0.3.14", "0.3.14", "1.22", "", TestOllamaComprehensive),
+		NewGeneralTestCase("ollama-0.3.14-options-extraction-test", ollama_module_name, "0.3.14", "0.3.14", "1.22", "", TestOllamaOptionsExtraction),
+		NewGeneralTestCase("ollama-0.3.14-server-address-test", ollama_module_name, "0.3.14", "0.3.14", "1.22", "", TestOllamaServerAddress),
+		NewGeneralTestCase("ollama-0.3.14-standard-attributes-test", ollama_module_name, "0.3.14", "0.3.14", "1.22", "", TestOllamaStandardAttributes),
 	)
 }
 
@@ -72,18 +72,6 @@ func TestLlama3Chat(t *testing.T, env ...string) {
 	RunApp(t, "test_llama3_chat", env...)
 }
 
-func TestOllamaCostCalculation(t *testing.T, env ...string) {
-	UseApp("ollama/v0.3.14")
-	RunGoBuild(t, "go", "build", "test_cost_calculation.go", "ollama_common.go")
-	RunApp(t, "test_cost_calculation", env...)
-}
-
-func TestOllamaBudgetTracking(t *testing.T, env ...string) {
-	UseApp("ollama/v0.3.14")
-	RunGoBuild(t, "go", "build", "test_budget_tracking.go", "ollama_common.go")
-	RunApp(t, "test_budget_tracking", env...)
-}
-
 func TestOllamaBackwardCompat(t *testing.T, env ...string) {
 	UseApp("ollama/v0.3.14")
 	RunGoBuild(t, "go", "build", "test_backward_compat.go", "ollama_common.go")
@@ -126,14 +114,26 @@ func TestOllamaModelManagement(t *testing.T, env ...string) {
 	RunApp(t, "test_model_management", env...)
 }
 
-func TestOllamaSLOMonitoring(t *testing.T, env ...string) {
-	UseApp("ollama/v0.3.14")
-	RunGoBuild(t, "go", "build", "test_slo_monitoring.go", "ollama_common.go")
-	RunApp(t, "test_slo_monitoring", env...)
-}
-
 func TestOllamaComprehensive(t *testing.T, env ...string) {
 	UseApp("ollama/v0.3.14")
 	RunGoBuild(t, "go", "build", "test_comprehensive.go", "ollama_common.go")
 	RunApp(t, "test_comprehensive", env...)
+}
+
+func TestOllamaOptionsExtraction(t *testing.T, env ...string) {
+	UseApp("ollama/v0.3.14")
+	RunGoBuild(t, "go", "build", "test_options_extraction.go", "ollama_common.go")
+	RunApp(t, "test_options_extraction", env...)
+}
+
+func TestOllamaServerAddress(t *testing.T, env ...string) {
+	UseApp("ollama/v0.3.14")
+	RunGoBuild(t, "go", "build", "test_server_address.go", "ollama_common.go")
+	RunApp(t, "test_server_address", env...)
+}
+
+func TestOllamaStandardAttributes(t *testing.T, env ...string) {
+	UseApp("ollama/v0.3.14")
+	RunGoBuild(t, "go", "build", "test_standard_attributes.go", "ollama_common.go")
+	RunApp(t, "test_standard_attributes", env...)
 }

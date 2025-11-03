@@ -41,7 +41,7 @@ func NewMockOllamaGenerateStreamServer(chunks []api.GenerateResponse) *httptest.
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/x-ndjson")
 		w.WriteHeader(http.StatusOK)
-		
+
 		encoder := json.NewEncoder(w)
 		for _, chunk := range chunks {
 			if err := encoder.Encode(chunk); err != nil {
@@ -67,7 +67,7 @@ func NewMockOllamaChatStreamServer(chunks []api.ChatResponse) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/x-ndjson")
 		w.WriteHeader(http.StatusOK)
-		
+
 		encoder := json.NewEncoder(w)
 		for _, chunk := range chunks {
 			if err := encoder.Encode(chunk); err != nil {
@@ -150,38 +150,38 @@ func NewMockOllamaGenerateWithTokens(ctx context.Context, promptTokens, completi
 
 var (
 	MockGenerateResponse = api.GenerateResponse{
-		Model:           "llama3:8b",
-		CreatedAt:       time.Now(),
-		Response:        "This is a mock generated response",
-		Done:            true,
-		Context:         []int{1, 2, 3, 4, 5},
+		Model:     "llama3:8b",
+		CreatedAt: time.Now(),
+		Response:  "This is a mock generated response",
+		Done:      true,
+		Context:   []int{1, 2, 3, 4, 5},
 		Metrics: api.Metrics{
-			TotalDuration:   1000000000, 
-			LoadDuration:    100000000,  
-			PromptEvalCount: 15,
+			TotalDuration:      1000000000,
+			LoadDuration:       100000000,
+			PromptEvalCount:    15,
 			PromptEvalDuration: 50000000,
-			EvalCount:       25,
-			EvalDuration:    150000000, 
+			EvalCount:          25,
+			EvalDuration:       150000000,
 		},
 	}
-	
+
 	MockGenerateStreamChunks = []api.GenerateResponse{
 		{Model: "llama3:8b", CreatedAt: time.Now(), Response: "Hello", Done: false},
 		{Model: "llama3:8b", CreatedAt: time.Now(), Response: " from", Done: false},
 		{Model: "llama3:8b", CreatedAt: time.Now(), Response: " mock", Done: false},
 		{Model: "llama3:8b", CreatedAt: time.Now(), Response: " streaming", Done: false},
-		{Model: "llama3:8b", CreatedAt: time.Now(), Response: "!", Done: true, 
+		{Model: "llama3:8b", CreatedAt: time.Now(), Response: "!", Done: true,
 			Metrics: api.Metrics{
-				PromptEvalCount: 10, 
-				EvalCount: 23, 
-				TotalDuration: 500000000,
-				LoadDuration: 50000000, 
-				PromptEvalDuration: 30000000, 
-				EvalDuration: 100000000,
+				PromptEvalCount:    10,
+				EvalCount:          23,
+				TotalDuration:      500000000,
+				LoadDuration:       50000000,
+				PromptEvalDuration: 30000000,
+				EvalDuration:       100000000,
 			},
 		},
 	}
-	
+
 	MockChatResponse = api.ChatResponse{
 		Model:     "llama3:8b",
 		CreatedAt: time.Now(),
@@ -189,36 +189,36 @@ var (
 			Role:    "assistant",
 			Content: "This is a mock chat response",
 		},
-		Done:            true,
+		Done: true,
 		Metrics: api.Metrics{
-			TotalDuration:   800000000, 
-			LoadDuration:    80000000, 
-			PromptEvalCount: 12,
-			PromptEvalDuration: 40000000, 
-			EvalCount:       20,
-			EvalDuration:    120000000,
+			TotalDuration:      800000000,
+			LoadDuration:       80000000,
+			PromptEvalCount:    12,
+			PromptEvalDuration: 40000000,
+			EvalCount:          20,
+			EvalDuration:       120000000,
 		},
 	}
-	
+
 	MockChatStreamChunks = []api.ChatResponse{
 		{Model: "llama3:8b", CreatedAt: time.Now(), Message: api.Message{Role: "assistant", Content: "Hi"}, Done: false},
 		{Model: "llama3:8b", CreatedAt: time.Now(), Message: api.Message{Role: "assistant", Content: " there"}, Done: false},
 		{Model: "llama3:8b", CreatedAt: time.Now(), Message: api.Message{Role: "assistant", Content: "!"}, Done: true,
 			Metrics: api.Metrics{
-				PromptEvalCount: 8, 
-				EvalCount: 15, 
-				TotalDuration: 400000000,
-				LoadDuration: 40000000, 
-				PromptEvalDuration: 20000000, 
-				EvalDuration: 80000000,
+				PromptEvalCount:    8,
+				EvalCount:          15,
+				TotalDuration:      400000000,
+				LoadDuration:       40000000,
+				PromptEvalDuration: 20000000,
+				EvalDuration:       80000000,
 			},
 		},
 	}
-	
+
 	ExpensiveGenerateResponse = api.GenerateResponse{
-		Model:           "llama3:70b",
-		Response:        "Response from expensive model",
-		Done:            true,
+		Model:    "llama3:70b",
+		Response: "Response from expensive model",
+		Done:     true,
 		Metrics: api.Metrics{
 			PromptEvalCount: 100,
 			EvalCount:       500,
@@ -232,42 +232,42 @@ func VerifyOllamaAttributes(span tracetest.SpanStub, operation, model string) {
 	if span.Name != expectedSpanName {
 		panic(fmt.Sprintf("Expected span name %s, got %s", expectedSpanName, span.Name))
 	}
-	
+
 	verifier.VerifyLLMAttributes(span, operation, "ollama", model)
-	
+
 	requiredAttrs := map[string]bool{
 		"gen_ai.system":         false,
 		"gen_ai.request.model":  false,
 		"gen_ai.operation.name": false,
 	}
-	
+
 	for _, attr := range span.Attributes {
 		key := string(attr.Key)
 		if _, ok := requiredAttrs[key]; ok {
 			requiredAttrs[key] = true
 		}
 	}
-	
+
 	for attr, found := range requiredAttrs {
 		if !found {
 			panic(fmt.Sprintf("Required attribute %s not found", attr))
 		}
 	}
-	
+
 	inputTokens := getAttributeValue(span, "gen_ai.usage.input_tokens")
 	outputTokens := getAttributeValue(span, "gen_ai.usage.output_tokens")
-	
+
 	if inputTokens == nil || outputTokens == nil {
 		panic(fmt.Sprintf("Token counts not found - input: %v, output: %v", inputTokens, outputTokens))
 	}
-	
+
 	if inputTokensInt, ok := inputTokens.(int64); ok && inputTokensInt <= 0 {
 		panic(fmt.Sprintf("Invalid input token count: %d", inputTokensInt))
 	}
 	if outputTokensInt, ok := outputTokens.(int64); ok && outputTokensInt <= 0 {
 		panic(fmt.Sprintf("Invalid output token count: %d", outputTokensInt))
 	}
-	
+
 	totalDuration := getAttributeValue(span, "gen_ai.response.total_duration_ms")
 	if totalDuration != nil {
 		if durationMs, ok := totalDuration.(float64); ok && durationMs <= 0 {
@@ -278,39 +278,8 @@ func VerifyOllamaAttributes(span tracetest.SpanStub, operation, model string) {
 
 func VerifyOllamaStreamingAttributes(span tracetest.SpanStub) {
 	streaming := getAttributeValue(span, "gen_ai.response.streaming")
-	if streaming != true {
-		panic(fmt.Sprintf("Expected streaming=true, got %v", streaming))
-	}
-}
-
-func VerifyOllamaCostAttributes(span tracetest.SpanStub) {
-	requiredAttrs := []string{
-		"gen_ai.cost.total_usd",
-		"gen_ai.cost.input_tokens_usd",
-		"gen_ai.cost.output_tokens_usd",
-		"gen_ai.cost.currency",
-		"gen_ai.cost.model_pricing_tier",
-	}
-	
-	for _, attr := range requiredAttrs {
-		if getAttributeValue(span, attr) == nil {
-			panic(fmt.Sprintf("Missing cost attribute: %s", attr))
-		}
-	}
-}
-
-func VerifyOllamaBudgetAttributes(span tracetest.SpanStub) {
-	requiredAttrs := []string{
-		"gen_ai.budget.status",
-		"gen_ai.budget.usage_percentage",
-		"gen_ai.budget.remaining_usd",
-		"gen_ai.budget.threshold_exceeded",
-	}
-	
-	for _, attr := range requiredAttrs {
-		if getAttributeValue(span, attr) == nil {
-			panic(fmt.Sprintf("Missing budget attribute: %s", attr))
-		}
+	if streaming != nil {
+		panic(fmt.Sprintf("gen_ai.response.streaming should not be present, got %v", streaming))
 	}
 }
 
@@ -318,7 +287,7 @@ func VerifyOllamaErrorSpan(span tracetest.SpanStub) {
 	if span.Status.Code != codes.Error {
 		panic(fmt.Sprintf("Expected error status, got %v", span.Status.Code))
 	}
-	
+
 	if span.Status.Description == "" {
 		panic("Error description not set in span")
 	}
@@ -354,6 +323,7 @@ func CreateSimpleTestClient(ctx context.Context, mockType string) (*api.Client, 
 		panic("Unknown mock type: " + mockType)
 	}
 }
+
 const testModel = "llama3.2:latest"
 
 func checkSpanAttributes(requiredAttributes []string) []string {

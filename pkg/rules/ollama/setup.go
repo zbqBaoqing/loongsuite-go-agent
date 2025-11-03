@@ -16,24 +16,147 @@ package ollama
 
 import (
 	"context"
-	_ "unsafe"
+	"net/url"
+	"reflect"
+	"unsafe"
 
 	"github.com/alibaba/loongsuite-go-agent/pkg/api"
 	"github.com/alibaba/loongsuite-go-agent/pkg/inst-api-semconv/instrumenter/ai"
 	ollamaapi "github.com/ollama/ollama/api"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
 )
+
+func extractServerAddress(c *ollamaapi.Client) string {
+	if c == nil {
+		return ""
+	}
+	clientValue := reflect.ValueOf(c).Elem()
+	baseField := clientValue.FieldByName("base")
+	if baseField.IsValid() && !baseField.IsNil() {
+		baseURL := reflect.NewAt(baseField.Type(), unsafe.Pointer(baseField.UnsafeAddr())).Elem().Interface().(*url.URL)
+		if baseURL != nil {
+			return baseURL.Host
+		}
+	}
+	return ""
+}
+
+func extractOptionsFromMap(opts map[string]interface{}) (
+	temperature float64,
+	maxTokens int64,
+	topK float64,
+	topP float64,
+	frequencyPenalty float64,
+	presencePenalty float64,
+	stopSequences []string,
+	seed int64,
+) {
+	if opts == nil {
+		return
+	}
+
+	if val, ok := opts["temperature"]; ok {
+		switch v := val.(type) {
+		case float64:
+			temperature = v
+		case float32:
+			temperature = float64(v)
+		}
+	}
+
+	if val, ok := opts["num_predict"]; ok {
+		switch v := val.(type) {
+		case float64:
+			maxTokens = int64(v)
+		case int:
+			maxTokens = int64(v)
+		case int64:
+			maxTokens = v
+		}
+	}
+
+	if val, ok := opts["top_k"]; ok {
+		switch v := val.(type) {
+		case float64:
+			topK = v
+		case int:
+			topK = float64(v)
+		}
+	}
+
+	if val, ok := opts["top_p"]; ok {
+		switch v := val.(type) {
+		case float64:
+			topP = v
+		case float32:
+			topP = float64(v)
+		}
+	}
+
+	if val, ok := opts["frequency_penalty"]; ok {
+		switch v := val.(type) {
+		case float64:
+			frequencyPenalty = v
+		case float32:
+			frequencyPenalty = float64(v)
+		}
+	}
+
+	if val, ok := opts["presence_penalty"]; ok {
+		switch v := val.(type) {
+		case float64:
+			presencePenalty = v
+		case float32:
+			presencePenalty = float64(v)
+		}
+	}
+
+	if val, ok := opts["stop"]; ok {
+		if arr, ok := val.([]interface{}); ok {
+			stopSequences = make([]string, 0, len(arr))
+			for _, v := range arr {
+				if str, ok := v.(string); ok {
+					stopSequences = append(stopSequences, str)
+				}
+			}
+		} else if arr, ok := val.([]string); ok {
+			stopSequences = arr
+		}
+	}
+
+	if val, ok := opts["seed"]; ok {
+		switch v := val.(type) {
+		case float64:
+			seed = int64(v)
+		case int:
+			seed = int64(v)
+		case int64:
+			seed = v
+		}
+	}
+
+	return
+}
 
 
 //go:linkname clientGenerateOnEnter github.com/ollama/ollama/api.clientGenerateOnEnter
 func clientGenerateOnEnter(call api.CallContext, c *ollamaapi.Client, ctx context.Context, req *ollamaapi.GenerateRequest, fn ollamaapi.GenerateResponseFunc) {
 	isStreaming := req.Stream == nil || (req.Stream != nil && *req.Stream)
+	temp, maxTok, tk, tp, fp, pp, stop, seed := extractOptionsFromMap(req.Options)
+
 	ollamaReq := ollamaRequest{
-		operationType: "generate",
-		model:         req.Model,
-		prompt:        req.Prompt,
-		isStreaming:   isStreaming,
+		operationType:    "generate",
+		model:            req.Model,
+		prompt:           req.Prompt,
+		isStreaming:      isStreaming,
+		serverAddress:    extractServerAddress(c),
+		temperature:      temp,
+		maxTokens:        maxTok,
+		topK:             tk,
+		topP:             tp,
+		frequencyPenalty: fp,
+		presencePenalty:  pp,
+		stopSequences:    stop,
+		seed:             seed,
 	}
 	ctx = ollamaInstrumenter.Start(ctx, ollamaReq)
 	call.SetParam(1, ctx)
@@ -106,27 +229,6 @@ func clientGenerateOnExit(call api.CallContext, err error) {
 
 			reqPtr.promptTokens = ollamaResp.promptTokens
 			reqPtr.completionTokens = ollamaResp.completionTokens
-			
-			calculator := costCalculator
-			if calculator != nil && calculator.IsEnabled() {
-				if isStreaming && streamState != nil && streamState.streamingCost != nil {
-					ollamaResp.costMetrics = streamState.streamingCost.GetMetrics()
-				} else {
-					costMetrics, _ := calculator.CalculateCost(
-						reqPtr.model,
-						ollamaResp.promptTokens,
-						ollamaResp.completionTokens,
-					)
-					ollamaResp.costMetrics = costMetrics
-				}
-				
-				if ollamaResp.costMetrics != nil && ollamaResp.costMetrics.TotalCost > 0 {
-					budgetTracker := budgetTracker
-					if budgetTracker != nil {
-						budgetTracker.RecordCost(ollamaResp.costMetrics.TotalCost)
-					}
-				}
-			}
 		}
 	}
 	// Set TTFT in context for metrics if streaming
@@ -140,11 +242,22 @@ func clientGenerateOnExit(call api.CallContext, err error) {
 //go:linkname clientChatOnEnter github.com/ollama/ollama/api.clientChatOnEnter
 func clientChatOnEnter(call api.CallContext, c *ollamaapi.Client, ctx context.Context, req *ollamaapi.ChatRequest, fn ollamaapi.ChatResponseFunc) {
 	isStreaming := req.Stream == nil || (req.Stream != nil && *req.Stream)
+	temp, maxTok, tk, tp, fp, pp, stop, seed := extractOptionsFromMap(req.Options)
+
 	ollamaReq := ollamaRequest{
-		operationType: "chat",
-		model:         req.Model,
-		messages:      req.Messages,
-		isStreaming:   isStreaming,
+		operationType:    "chat",
+		model:            req.Model,
+		messages:         req.Messages,
+		isStreaming:      isStreaming,
+		serverAddress:    extractServerAddress(c),
+		temperature:      temp,
+		maxTokens:        maxTok,
+		topK:             tk,
+		topP:             tp,
+		frequencyPenalty: fp,
+		presencePenalty:  pp,
+		stopSequences:    stop,
+		seed:             seed,
 	}
 	ctx = ollamaInstrumenter.Start(ctx, ollamaReq)
 	call.SetParam(1, ctx)
@@ -217,27 +330,6 @@ func clientChatOnExit(call api.CallContext, err error) {
 
 			reqPtr.promptTokens = ollamaResp.promptTokens
 			reqPtr.completionTokens = ollamaResp.completionTokens
-			
-			calculator := costCalculator
-			if calculator != nil && calculator.IsEnabled() {
-				if isStreaming && streamState != nil && streamState.streamingCost != nil {
-					ollamaResp.costMetrics = streamState.streamingCost.GetMetrics()
-				} else {
-					costMetrics, _ := calculator.CalculateCost(
-						reqPtr.model,
-						ollamaResp.promptTokens,
-						ollamaResp.completionTokens,
-					)
-					ollamaResp.costMetrics = costMetrics
-				}
-				
-				if ollamaResp.costMetrics != nil && ollamaResp.costMetrics.TotalCost > 0 {
-					budgetTracker := budgetTracker
-					if budgetTracker != nil {
-						budgetTracker.RecordCost(ollamaResp.costMetrics.TotalCost)
-					}
-				}
-			}
 		}
 	}
 	// Set TTFT in context for metrics if streaming
@@ -253,11 +345,22 @@ func clientEmbedOnEnter(call api.CallContext, c *ollamaapi.Client, ctx context.C
 	if s, ok := req.Input.(string); ok {
 		promptStr = s
 	}
+	temp, maxTok, tk, tp, fp, pp, stop, seed := extractOptionsFromMap(req.Options)
+
 	ollamaReq := ollamaRequest{
-		operationType:  "embed",
-		model:          req.Model,
-		prompt:         promptStr,
-		embeddingCount: 1,
+		operationType:    "embed",
+		model:            req.Model,
+		prompt:           promptStr,
+		embeddingCount:   1,
+		serverAddress:    extractServerAddress(c),
+		temperature:      temp,
+		maxTokens:        maxTok,
+		topK:             tk,
+		topP:             tp,
+		frequencyPenalty: fp,
+		presencePenalty:  pp,
+		stopSequences:    stop,
+		seed:             seed,
 	}
 	ctx = ollamaInstrumenter.Start(ctx, ollamaReq)
 	call.SetParam(1, ctx)
@@ -294,8 +397,6 @@ func clientEmbedOnExit(call api.CallContext, resp *ollamaapi.EmbedResponse, err 
 			}
 			ollamaResp.embeddings = embeddings
 			reqPtr.embeddingDim = len(resp.Embeddings[0])
-			costMetrics := calculateEmbeddingCost(reqPtr.model, 1, reqPtr.embeddingDim)
-			ollamaResp.costMetrics = costMetrics
 		}
 	}
 	ollamaInstrumenter.End(ctx, *reqPtr, ollamaResp, err)
@@ -303,11 +404,22 @@ func clientEmbedOnExit(call api.CallContext, resp *ollamaapi.EmbedResponse, err 
 
 //go:linkname clientEmbeddingsOnEnter github.com/ollama/ollama/api.clientEmbeddingsOnEnter
 func clientEmbeddingsOnEnter(call api.CallContext, c *ollamaapi.Client, ctx context.Context, req *ollamaapi.EmbeddingRequest) {
+	temp, maxTok, tk, tp, fp, pp, stop, seed := extractOptionsFromMap(req.Options)
+
 	ollamaReq := ollamaRequest{
-		operationType:  "embeddings",
-		model:          req.Model,
-		prompt:         req.Prompt,
-		embeddingCount: 1,
+		operationType:    "embeddings",
+		model:            req.Model,
+		prompt:           req.Prompt,
+		embeddingCount:   1,
+		serverAddress:    extractServerAddress(c),
+		temperature:      temp,
+		maxTokens:        maxTok,
+		topK:             tk,
+		topP:             tp,
+		frequencyPenalty: fp,
+		presencePenalty:  pp,
+		stopSequences:    stop,
+		seed:             seed,
 	}
 	ctx = ollamaInstrumenter.Start(ctx, ollamaReq)
 	call.SetParam(1, ctx)
@@ -336,8 +448,6 @@ func clientEmbeddingsOnExit(call api.CallContext, resp *ollamaapi.EmbeddingRespo
 	if err == nil && resp != nil {
 		if len(resp.Embedding) > 0 {
 			reqPtr.embeddingDim = len(resp.Embedding)
-			costMetrics := calculateEmbeddingCost(reqPtr.model, 1, reqPtr.embeddingDim)
-			ollamaResp.costMetrics = costMetrics
 		}
 	}
 	ollamaInstrumenter.End(ctx, *reqPtr, ollamaResp, err)
@@ -349,28 +459,10 @@ func clientPullOnEnter(call api.CallContext, c *ollamaapi.Client, ctx context.Co
 		operationType:  "pull",
 		model:          req.Model,
 		modelOperation: "pull",
+		serverAddress:  extractServerAddress(c),
 	}
 	ctx = ollamaInstrumenter.Start(ctx, ollamaReq)
 	call.SetParam(1, ctx)
-	var wrappedFn ollamaapi.PullProgressFunc = func(progress ollamaapi.ProgressResponse) error {
-		if span := trace.SpanFromContext(ctx); span.IsRecording() {
-			if progress.Total > 0 {
-				progressPct := float64(progress.Completed) / float64(progress.Total) * 100
-				span.AddEvent("Pull progress",
-					trace.WithAttributes(
-						attribute.String("status", progress.Status),
-						attribute.Float64("progress_percentage", progressPct),
-						attribute.Int64("bytes_completed", progress.Completed),
-						attribute.Int64("bytes_total", progress.Total),
-					))
-			}
-		}
-		if fn != nil {
-			return fn(progress)
-		}
-		return nil
-	}
-	call.SetParam(3, wrappedFn)
 	data := make(map[string]interface{})
 	data["ctx"] = ctx
 	data["request"] = &ollamaReq
@@ -392,11 +484,7 @@ func clientPullOnExit(call api.CallContext, err error) {
 		return
 	}
 	ollamaResp := ollamaResponse{
-		err:        err,
-		pullStatus: "completed",
-	}
-	if err != nil {
-		ollamaResp.pullStatus = "failed"
+		err: err,
 	}
 	ollamaInstrumenter.End(ctx, *reqPtr, ollamaResp, err)
 }
@@ -406,6 +494,7 @@ func clientListOnEnter(call api.CallContext, c *ollamaapi.Client, ctx context.Co
 	ollamaReq := ollamaRequest{
 		operationType:  "list",
 		modelOperation: "list",
+		serverAddress:  extractServerAddress(c),
 	}
 	ctx = ollamaInstrumenter.Start(ctx, ollamaReq)
 	call.SetParam(1, ctx)
@@ -429,18 +518,8 @@ func clientListOnExit(call api.CallContext, resp *ollamaapi.ListResponse, err er
 	if !ok || reqPtr == nil {
 		return
 	}
-	ollamaResp := ollamaResponse{}
-	ollamaResp.err = err
-	if err == nil && resp != nil {
-		modelList := make([]interface{}, 0, len(resp.Models))
-		for _, m := range resp.Models {
-			modelList = append(modelList, map[string]interface{}{
-				"name":       m.Name,
-				"size":       m.Size,
-				"modified_at": m.ModifiedAt,
-			})
-		}
-		ollamaResp.modelList = modelList
+	ollamaResp := ollamaResponse{
+		err: err,
 	}
 	ollamaInstrumenter.End(ctx, *reqPtr, ollamaResp, err)
 }
@@ -451,6 +530,7 @@ func clientShowOnEnter(call api.CallContext, c *ollamaapi.Client, ctx context.Co
 		operationType:  "show",
 		model:          req.Model,
 		modelOperation: "show",
+		serverAddress:  extractServerAddress(c),
 	}
 	ctx = ollamaInstrumenter.Start(ctx, ollamaReq)
 	call.SetParam(1, ctx)
@@ -474,15 +554,8 @@ func clientShowOnExit(call api.CallContext, resp *ollamaapi.ShowResponse, err er
 	if !ok || reqPtr == nil {
 		return
 	}
-	ollamaResp := ollamaResponse{}
-	ollamaResp.err = err
-	if err == nil && resp != nil {
-		ollamaResp.modelInfo = map[string]interface{}{
-			"family":         resp.Details.Family,
-			"parameter_size": resp.Details.ParameterSize,
-			"format":         resp.Details.Format,
-			"families":       resp.Details.Families,
-		}
+	ollamaResp := ollamaResponse{
+		err: err,
 	}
 	ollamaInstrumenter.End(ctx, *reqPtr, ollamaResp, err)
 }
@@ -493,6 +566,7 @@ func clientDeleteOnEnter(call api.CallContext, c *ollamaapi.Client, ctx context.
 		operationType:  "delete",
 		model:          req.Model,
 		modelOperation: "delete",
+		serverAddress:  extractServerAddress(c),
 	}
 	ctx = ollamaInstrumenter.Start(ctx, ollamaReq)
 	call.SetParam(1, ctx)
@@ -528,6 +602,7 @@ func clientCopyOnEnter(call api.CallContext, c *ollamaapi.Client, ctx context.Co
 		operationType:  "copy",
 		model:          req.Source,
 		modelOperation: "copy",
+		serverAddress:  extractServerAddress(c),
 	}
 	ctx = ollamaInstrumenter.Start(ctx, ollamaReq)
 	call.SetParam(1, ctx)

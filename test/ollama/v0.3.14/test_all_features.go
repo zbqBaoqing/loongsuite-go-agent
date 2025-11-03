@@ -40,9 +40,6 @@ func main() {
 
 		hasChat := false
 		hasGenerate := false
-		hasStreaming := false
-		hasCost := false
-
 		for _, trace := range stubs {
 			for _, span := range trace {
 				for _, attr := range span.Attributes {
@@ -53,18 +50,12 @@ func main() {
 						} else if attr.Value.AsString() == "generate" {
 							hasGenerate = true
 						}
-					case "gen_ai.response.streaming":
-						if attr.Value.AsBool() {
-							hasStreaming = true
-						}
-					case "gen_ai.cost.total_usd":
-						hasCost = true
 					}
 				}
 			}
 		}
 
-		if !hasChat || !hasGenerate || !hasStreaming || !hasCost {
+		if !hasChat || !hasGenerate {
 			panic("Not all features were properly tested")
 		}
 	}, 5)

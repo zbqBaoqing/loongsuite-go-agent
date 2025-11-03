@@ -36,6 +36,16 @@ type ollamaRequest struct {
 	embeddingDim     int
 	modelOperation   string
 	downloadProgress float64
+	serverAddress    string
+
+	temperature      float64
+	maxTokens        int64
+	topK             float64
+	topP             float64
+	frequencyPenalty float64
+	presencePenalty  float64
+	stopSequences    []string
+	seed             int64
 }
 
 type streamingState struct {

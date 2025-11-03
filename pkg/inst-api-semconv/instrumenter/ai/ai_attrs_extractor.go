@@ -59,9 +59,6 @@ func (h *AILLMAttrsExtractor[REQUEST, RESPONSE, GETTER1, GETTER2]) OnStart(attri
 		Key:   semconv.GenAIRequestModelKey,
 		Value: attribute.StringValue(h.LLMGetter.GetAIRequestModel(request)),
 	}, attribute.KeyValue{
-		Key:   semconv.GenAIRequestEncodingFormatsKey,
-		Value: attribute.StringSliceValue(h.LLMGetter.GetAIRequestEncodingFormats(request)),
-	}, attribute.KeyValue{
 		Key:   semconv.GenAIRequestMaxTokensKey,
 		Value: attribute.Int64Value(h.LLMGetter.GetAIRequestMaxTokens(request)),
 	}, attribute.KeyValue{
@@ -86,12 +83,17 @@ func (h *AILLMAttrsExtractor[REQUEST, RESPONSE, GETTER1, GETTER2]) OnStart(attri
 		Key:   semconv.GenAIUsageInputTokensKey,
 		Value: attribute.Int64Value(h.LLMGetter.GetAIUsageInputTokens(request)),
 	}, attribute.KeyValue{
-		Key:   semconv.ServerAddressKey,
-		Value: attribute.StringValue(h.LLMGetter.GetAIServerAddress(request)),
-	}, attribute.KeyValue{
 		Key:   semconv.GenAIRequestSeedKey,
 		Value: attribute.Int64Value(h.LLMGetter.GetAIRequestSeed(request)),
 	})
+
+	if serverAddress := h.LLMGetter.GetAIServerAddress(request); serverAddress != "" {
+		attributes = append(attributes, attribute.KeyValue{
+			Key:   semconv.ServerAddressKey,
+			Value: attribute.StringValue(serverAddress),
+		})
+	}
+
 	if h.Base.AttributesFilter != nil {
 		attributes = h.Base.AttributesFilter(attributes)
 	}
@@ -104,9 +106,6 @@ func (h *AILLMAttrsExtractor[REQUEST, RESPONSE, GETTER1, GETTER2]) OnEnd(attribu
 		Key:   semconv.GenAIResponseFinishReasonsKey,
 		Value: attribute.StringSliceValue(h.LLMGetter.GetAIResponseFinishReasons(request, response)),
 	}, attribute.KeyValue{
-		Key:   semconv.GenAIResponseIDKey,
-		Value: attribute.StringValue(h.LLMGetter.GetAIResponseID(request, response)),
-	}, attribute.KeyValue{
 		Key:   semconv.GenAIResponseModelKey,
 		Value: attribute.StringValue(h.LLMGetter.GetAIResponseModel(request, response)),
 	}, attribute.KeyValue{
@@ -115,9 +114,15 @@ func (h *AILLMAttrsExtractor[REQUEST, RESPONSE, GETTER1, GETTER2]) OnEnd(attribu
 	}, attribute.KeyValue{
 		Key:   semconv.GenAIUsageOutputTokensKey,
 		Value: attribute.Int64Value(h.LLMGetter.GetAIUsageOutputTokens(request, response)),
-	}, attribute.KeyValue{
-		Key:   semconv.GenAIResponseIDKey,
-		Value: attribute.StringValue(h.LLMGetter.GetAIResponseID(request, response)),
 	})
+
+	// Only add response id if it's not empty
+	if responseID := h.LLMGetter.GetAIResponseID(request, response); responseID != "" {
+		attributes = append(attributes, attribute.KeyValue{
+			Key:   semconv.GenAIResponseIDKey,
+			Value: attribute.StringValue(responseID),
+		})
+	}
+
 	return attributes, context
 }
